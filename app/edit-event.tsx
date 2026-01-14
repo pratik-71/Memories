@@ -1,10 +1,10 @@
+import { AestheticDatePicker, AestheticTimePicker } from '@/components/DateTimePicker';
 import { FullScreenLoader } from '@/components/FullScreenLoader';
 import { ImageModal } from '@/components/ImageModal';
 import { useEventStore } from '@/store/eventStore';
 import { useThemeStore } from '@/store/themeStore';
 import { cancelEventNotifications, scheduleEventNotifications } from '@/utils/notifications';
 import { Feather } from '@expo/vector-icons';
-import DateTimePicker from '@react-native-community/datetimepicker';
 import * as ImagePicker from 'expo-image-picker';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -30,8 +30,10 @@ export default function EditEvent() {
     const [title, setTitle] = useState('');
     const [description, setDescription] = useState('');
     const [date, setDate] = useState(new Date());
-    const [mode, setMode] = useState<'date' | 'time'>('date');
-    const [show, setShow] = useState(false);
+
+    // Independent visibility states
+    const [datePickerVisible, setDatePickerVisible] = useState(false);
+    const [timePickerVisible, setTimePickerVisible] = useState(false);
 
     // Image states
     const [selectedImages, setSelectedImages] = useState<string[]>([]);
@@ -47,15 +49,16 @@ export default function EditEvent() {
         }
     }, [eventToEdit]);
 
-    const onChange = (event: any, selectedDate?: Date) => {
-        const currentDate = selectedDate || date;
-        setShow(false);
-        setDate(currentDate);
+    const handleDateSelect = (newDate: Date) => {
+        // Keep the existing time when changing date
+        const updatedDate = new Date(newDate);
+        updatedDate.setHours(date.getHours());
+        updatedDate.setMinutes(date.getMinutes());
+        setDate(updatedDate);
     };
 
-    const showMode = (currentMode: 'date' | 'time') => {
-        setShow(true);
-        setMode(currentMode);
+    const handleTimeSelect = (newDate: Date) => {
+        setDate(newDate);
     };
 
     const pickImage = async () => {
@@ -168,7 +171,7 @@ export default function EditEvent() {
                         <Text style={{ color: currentTheme.colors.text.secondary }} className="text-sm font-bold uppercase mb-2">When</Text>
                         <View className="flex-row gap-4">
                             <TouchableOpacity
-                                onPress={() => showMode('date')}
+                                onPress={() => setDatePickerVisible(true)}
                                 style={{
                                     backgroundColor: 'rgba(255,255,255,0.05)',
                                     borderColor: 'rgba(255,255,255,0.1)'
@@ -182,7 +185,7 @@ export default function EditEvent() {
                             </TouchableOpacity>
 
                             <TouchableOpacity
-                                onPress={() => showMode('time')}
+                                onPress={() => setTimePickerVisible(true)}
                                 style={{
                                     backgroundColor: 'rgba(255,255,255,0.05)',
                                     borderColor: 'rgba(255,255,255,0.1)'
@@ -195,16 +198,6 @@ export default function EditEvent() {
                                 </Text>
                             </TouchableOpacity>
                         </View>
-
-                        {show && (
-                            <DateTimePicker
-                                testID="dateTimePicker"
-                                value={date}
-                                mode={mode}
-                                is24Hour={true}
-                                onChange={onChange}
-                            />
-                        )}
                     </View>
 
                     {/* Photos Selection */}
@@ -263,6 +256,20 @@ export default function EditEvent() {
                 visible={!!previewImage}
                 imageUri={previewImage}
                 onClose={() => setPreviewImage(null)}
+            />
+
+            <AestheticDatePicker
+                visible={datePickerVisible}
+                onClose={() => setDatePickerVisible(false)}
+                onSelect={handleDateSelect}
+                currentDate={date}
+            />
+
+            <AestheticTimePicker
+                visible={timePickerVisible}
+                onClose={() => setTimePickerVisible(false)}
+                onSelect={handleTimeSelect}
+                currentDate={date}
             />
         </View>
     );
