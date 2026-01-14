@@ -20,128 +20,179 @@ export async function cancelEventNotifications(eventId: string) {
     }
 }
 
-export async function scheduleEventNotifications(eventId: string, title: string, dateStr: string) {
+export async function scheduleEventNotifications(eventId: string, title: string, dateStr: string, isTimeCapsule: boolean = false) {
     const hasPermission = await requestNotificationPermissions();
     if (!hasPermission) return;
 
     const eventDate = new Date(dateStr);
     const now = new Date();
 
-    const schedule = async (triggerDate: Date, body: string, idSuffix: string) => {
-        // Ensure we are scheduling in the future
-        if (triggerDate > now) {
-            triggerDate.setHours(9, 0, 0, 0); // Normalize to 9 AM
-            
-            // Double check validation after normalization
-            if (triggerDate > now) {
-                await Notifications.scheduleNotificationAsync({
-                    content: {
-                        title: "Memories Milestone",
-                        body: body,
-                        data: { eventId, type: idSuffix },
-                    },
-                    trigger: {
-                        type: Notifications.SchedulableTriggerInputTypes.DATE,
-                        date: triggerDate,
-                    },
-                });
-            }
+    // Helper to format numbers (1000 -> 1k, 1500 -> 1.5k)
+    const formatNumber = (num: number) => {
+        if (num >= 1000) {
+            const k = num / 1000;
+            return `${Number.isInteger(k) ? k : k.toFixed(1)}k`;
+        }
+        return num.toString();
+    };
+
+    // Store all potential notifications in memory first
+    // This allows us to calculate "Lifetime" coverage but only schedule what the OS allows (next ~60)
+    interface NotificationCandidate {
+        triggerDate: Date;
+        title: string;
+        body: string;
+        idSuffix: string;
+    }
+    const candidates: NotificationCandidate[] = [];
+
+    const addCandidate = (triggerDate: Date, notifTitle: string, body: string, idSuffix: string, prioritizeMorning: boolean = false) => {
+        const d = new Date(triggerDate);
+        if (prioritizeMorning) {
+            d.setHours(9, 0, 0, 0);
+        }
+        // Only add if it's in the future
+        if (d > now) {
+            candidates.push({
+               triggerDate: d,
+               title: notifTitle,
+               body,
+               idSuffix
+            });
         }
     };
 
-    // 1. Fixed Day Milestones (50, 100, 500, 1000)
-    // Includes Countdown Logic: 3 days before, 1 day before
-    const distinctDays = [50, 100, 500, 1000];
-
-    for (const days of distinctDays) {
-        let triggerDate = new Date(eventDate.getTime());
-        triggerDate.setDate(triggerDate.getDate() + days);
-        
-        const milestoneName = `${days} days`;
-        
-        // Actual Milestone
-        await schedule(triggerDate, `Happy ${milestoneName} since ${title}!`, `day-${days}`);
-
-        // Countdown: 3 Days before
-        let warn3 = new Date(triggerDate);
-        warn3.setDate(warn3.getDate() - 3);
-        await schedule(warn3, `3 days to go until ${milestoneName} of ${title}!`, `warn-3-day-${days}`);
-
-        // Countdown: 1 Day before
-        let warn1 = new Date(triggerDate);
-        warn1.setDate(warn1.getDate() - 1);
-        await schedule(warn1, `1 day to go until ${milestoneName} of ${title}!`, `warn-1-day-${days}`);
+    // 0. Time Capsule Unlocking (Specific Event)
+    if (isTimeCapsule) {
+        addCandidate(
+            eventDate,
+            "🔐 Time Capsule Unlocked!",
+            `✨ The time has come! Your time capsule "${title}" is now open. Tap to view! 🔓`,
+            "capsule-open",
+            false // Exact time
+        );
     }
 
-    // 2. Yearly Anniversaries (1 to 10 Years)
-    // Includes Countdown Logic
-    for (let i = 1; i <= 10; i++) {
-        let triggerDate = new Date(eventDate.getTime());
-        triggerDate.setFullYear(triggerDate.getFullYear() + i);
-
-        const milestoneName = `${i} Year${i > 1 ? 's' : ''}`;
-
-        // Anniversary Notification
-        await schedule(triggerDate, `Happy Anniversary! ${i} Year${i > 1 ? 's' : ''} since ${title}.`, `year-${i}`);
-
-        // Countdown: 3 Days before
-        let warn3 = new Date(triggerDate);
-        warn3.setDate(warn3.getDate() - 3);
-        await schedule(warn3, `3 days to go until your ${i} Year Anniversary of ${title}!`, `warn-3-year-${i}`);
-
-        // Countdown: 1 Day before
-        let warn1 = new Date(triggerDate);
-        warn1.setDate(warn1.getDate() - 1);
-        await schedule(warn1, `1 day to go until your ${i} Year Anniversary of ${title}!`, `warn-1-year-${i}`);
+    // 1. Minutes
+    // 100, 500, then every 500 starting from 1000
+    // Lifetime: 100 Years = ~52,560,000 minutes
+    // We can iterate this efficiently in JS
+    const minuteMilestones = [100, 500];
+    const MINUTE_LIMIT = 52560000; // ~100 years
+    for (let m = 1000; m <= MINUTE_LIMIT; m += 500) {
+        minuteMilestones.push(m);
+    }
+    for (const mins of minuteMilestones) {
+        // Optimization: Check if this specific milestone is already past before creating Date object? 
+        // JS creates objects fast, but let's be safe.
+        // eventDate + mins * 60000 > now
+        // mins * 60000 > now - eventDate
+        // This check is implicitly done in addCandidate but doing it here might save Date allocs.
+        // For simplicity and robustness, currently just running the loop is fine for 100k items.
+        
+        const trigger = new Date(eventDate.getTime() + mins * 60000);
+        const label = formatNumber(mins);
+        addCandidate(
+            trigger, 
+            `✨ ${title}`,
+            `⏳ ${label} Minutes passed! Time to celebrate! 🎉`, 
+            `mins-${mins}`, 
+            false
+        );
     }
 
-    // 3. Monthly Recurring (Up to 50 Years)
-    // "1 year 1 month completed", "3 months completed"
-    for (let i = 1; i <= 600; i++) {
-        // Skip exact years (12, 24) as they are covered by the Yearly Anniversary loop which is more special
-        if (i % 12 === 0) continue;
+    // 2. Hours
+    // 10, 50, 100, 500, then every 500
+    // Lifetime: 100 Years = ~876,000 hours
+    const hourMilestones = [10, 50, 100, 500];
+    const HOUR_LIMIT = 876000; 
+    for (let h = 1000; h <= HOUR_LIMIT; h += 500) {
+        hourMilestones.push(h);
+    }
+    for (const hours of hourMilestones) {
+        const trigger = new Date(eventDate.getTime() + hours * 3600000);
+        const label = formatNumber(hours);
+        addCandidate(
+            trigger,
+            `✨ ${title}`,
+            `⚡ ${label} Hours passed! Time to celebrate! 🚀`, 
+            `hours-${hours}`, 
+            false
+        );
+    }
 
-        let triggerDate = new Date(eventDate.getTime());
-        
-        // Add months safely
-        const targetMonth = triggerDate.getMonth() + i;
-        triggerDate.setMonth(targetMonth);
-        
-        // Adjust for month length discrepancies (e.g. Jan 31 + 1 month -> Feb 28/29)
-        // If the date accidentally rolled over to the next month (e.g. March 2nd), pull it back to last day of Feb.
-        if (triggerDate.getDate() !== eventDate.getDate()) {
-             // Basic fix: set to day 0 of current month (last day of previous)
-             // This happens if we were Jan 31 and ended up March 3
-             // We want Feb 28
-             triggerDate.setDate(0); 
+    // 3. Days
+    // 1, 7, 50, 100, 500, then every 1000
+    // Lifetime: 100 Years = ~36,500 days
+    const dayMilestones = [1, 7, 50, 100, 500];
+    for (let d = 1000; d <= 36500; d += 1000) {
+        dayMilestones.push(d);
+    }
+    for (const days of dayMilestones) {
+        const trigger = new Date(eventDate);
+        trigger.setDate(trigger.getDate() + days);
+        const label = formatNumber(days);
+        const suffix = days === 1 ? 'Day' : 'Days';
+        addCandidate(
+            trigger,
+            `✨ ${title}`,
+            `🗓️ ${label} ${suffix} passed! Time to celebrate! 🥂`, 
+            `days-${days}`, 
+            true
+        );
+    }
+
+    // 4. Months & Years
+    // Lifetime: 100 Years = 1200 months
+    for (let i = 1; i <= 1200; i++) {
+        const trigger = new Date(eventDate);
+        const targetMonth = trigger.getMonth() + i;
+        trigger.setMonth(targetMonth);
+        if (trigger.getDate() !== eventDate.getDate()) {
+            trigger.setDate(0); 
         }
 
         const years = Math.floor(i / 12);
         const months = i % 12;
 
-        let timeStr = "";
-        if (years > 0) timeStr += `${years} Year${years > 1 ? 's' : ''} `;
-        if (months > 0) timeStr += `${months} Month${months > 1 ? 's' : ''} `;
-        
-        await schedule(triggerDate, `${timeStr.trim()} completed since ${title}.`, `month-${i}`);
-    }
-
-    // 4. Hourly Milestones
-    // 100, 500, then every 1k up to 500k (~57 years)
-    const hourMilestones = [100, 500];
-    for (let h = 1000; h <= 500000; h += 1000) {
-        hourMilestones.push(h);
-    }
-
-    for (const hours of hourMilestones) {
-        let triggerDate = new Date(eventDate.getTime());
-        triggerDate.setTime(triggerDate.getTime() + (hours * 60 * 60 * 1000));
-        
-        let label = `${hours} Hours`;
-        if (hours >= 1000) {
-            label = `${hours / 1000}k Hours`;
+        let label = "";
+        if (months === 0) {
+            label = `${years} Year${years > 1 ? 's' : ''} complete`;
+        } else {
+            const yStr = years > 0 ? `${years} Year${years > 1 ? 's' : ''} ` : "";
+            const mStr = `${months} Month${months > 1 ? 's' : ''}`;
+            label = `${yStr}${mStr} passed`;
         }
 
-        await schedule(triggerDate, `${label} passed since ${title}.`, `hours-${hours}`);
+        addCandidate(
+            trigger,
+            `✨ ${title}`,
+            `🏆 ${label}! Time to celebrate! 🎂`, 
+            `month-${i}`, 
+            true
+        );
+    }
+
+    // SORT candidates by Date (Ascending)
+    candidates.sort((a, b) => a.triggerDate.getTime() - b.triggerDate.getTime());
+
+    // TAKE the first 60 (System Limit Safeguard)
+    // Most devices limit to 64. We use 60 to be safe and leave room for other apps/notifications.
+    const notificationsToSchedule = candidates.slice(0, 60);
+
+    // SCHEDULE them
+    for (const item of notificationsToSchedule) {
+        await Notifications.scheduleNotificationAsync({
+            content: {
+                title: item.title,
+                body: item.body,
+                data: { eventId, type: item.idSuffix },
+                sound: 'default',
+            },
+            trigger: {
+                type: Notifications.SchedulableTriggerInputTypes.DATE,
+                date: item.triggerDate,
+            },
+        });
     }
 }

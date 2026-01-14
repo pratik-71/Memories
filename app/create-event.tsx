@@ -99,7 +99,7 @@ export default function CreateEvent() {
             });
 
             if (newEventId) {
-                await scheduleEventNotifications(newEventId, title.trim(), date.toISOString());
+                await scheduleEventNotifications(newEventId, title.trim(), date.toISOString(), isTimeCapsule);
             }
 
             router.back();

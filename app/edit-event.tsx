@@ -106,7 +106,8 @@ export default function EditEvent() {
 
                 // Reschedule notifications
                 await cancelEventNotifications(id);
-                await scheduleEventNotifications(id, title.trim(), date.toISOString());
+                // Preserve original isTimeCapsule state if it exists
+                await scheduleEventNotifications(id, title.trim(), date.toISOString(), eventToEdit?.isTimeCapsule || false);
 
                 router.back();
             } catch (error: any) {
