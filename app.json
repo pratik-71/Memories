@@ -1,17 +1,24 @@
 {
   "expo": {
-    "name": "specialday",
-    "slug": "specialday",
+    "name": "Memories",
+    "slug": "memories",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "specialday",
+    "scheme": "memories",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.venture.memories",
+      "infoPlist": {
+        "NSPhotoLibraryUsageDescription": "The app accesses your photos to let you set cover images for your special memories.",
+        "NSCameraUsageDescription": "The app needs access to your camera to let you take photos for your memories.",
+        "NSMicrophoneUsageDescription": "The app needs access to your microphone when taking videos for your memories."
+      }
     },
     "android": {
+      "package": "com.venture.memories",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -19,7 +26,10 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "android.permission.RECORD_AUDIO"
+      ]
     },
     "web": {
       "output": "static",
@@ -37,6 +47,20 @@
           "dark": {
             "backgroundColor": "#000000"
           }
+        }
+      ],
+      "@react-native-community/datetimepicker",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/notification-icon.png",
+          "color": "#000000"
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "The app accesses your photos to let you set cover images for your special memories."
         }
       ]
     ],

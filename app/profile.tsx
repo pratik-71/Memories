@@ -1,0 +1,178 @@
+import { useThemeStore } from '@/store/themeStore';
+import { Feather } from '@expo/vector-icons';
+import { GoogleSignin } from '@react-native-google-signin/google-signin';
+import { useRouter } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
+import { useEffect, useState } from 'react';
+import { Alert, Dimensions, Image, ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import Animated, { FadeInDown } from 'react-native-reanimated';
+import { supabase } from '../lib/supabase';
+
+const { width } = Dimensions.get('window');
+
+export default function Profile() {
+    const router = useRouter();
+    const currentTheme = useThemeStore((state) => state.currentTheme);
+    const [user, setUser] = useState<any>(null);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        getProfile();
+    }, []);
+
+    async function getProfile() {
+        try {
+            const { data: { user } } = await supabase.auth.getUser();
+            setUser(user);
+        } catch (error) {
+            console.log('Error fetching user:', error);
+        } finally {
+            setLoading(false);
+        }
+    }
+
+
+
+    const handleSignOut = async () => {
+        try {
+            await supabase.auth.signOut();
+            try {
+                await GoogleSignin.signOut();
+            } catch (e) {
+                console.log("Google SignOut Error:", e);
+            }
+
+            // Navigate to Welcome screen instead of Sign-in, clearing the stack
+            router.dismissAll();
+            router.replace('/Onboarding/Welcome');
+        } catch (error: any) {
+            Alert.alert('Error', error.message);
+        }
+    };
+
+    const menuItems = [
+        {
+            label: 'Subscription',
+            value: 'Free Plan',
+            icon: 'zap', // Feather icon name
+            action: () => router.push('/subscription')
+        },
+        {
+            label: 'Privacy Policy',
+            icon: 'lock',
+            action: () => router.push('/privacy-policy')
+        },
+        {
+            label: 'Terms and Conditions',
+            icon: 'file-text',
+            action: () => router.push('/terms-conditions')
+        },
+
+    ];
+
+    return (
+        <View style={{ backgroundColor: currentTheme.colors.background }} className="flex-1">
+            <StatusBar style="light" />
+
+            <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
+                {/* Header with Back Button */}
+                {/* Header with Back Button */}
+                <View className="flex-row items-center justify-between px-6 pt-12 pb-4">
+                    <TouchableOpacity
+                        onPress={() => router.back()}
+                        className="w-10 h-10 rounded-full bg-white/5 items-center justify-center active:bg-white/10"
+                    >
+                        <Feather name="arrow-left" size={24} color={currentTheme.colors.text.primary} />
+                    </TouchableOpacity>
+                    <Text style={{ color: currentTheme.colors.text.primary, fontFamily: 'Outfit-Bold' }} className="text-3xl">
+                        Profile
+                    </Text>
+                    <View className="w-10" />
+                </View>
+
+
+                {/* Profile Info */}
+                <Animated.View
+                    entering={FadeInDown.delay(100).springify()}
+                    className="items-center px-6 mt-6 mb-10"
+                >
+                    <View className="relative mb-4">
+                        <Image
+                            source={require('@/assets/profile.png')}
+                            style={{
+                                width: 120,
+                                height: 120,
+                                borderRadius: 60,
+                                borderWidth: 4,
+                                borderColor: 'rgba(255,255,255,0.1)'
+                            }}
+                            resizeMode="cover"
+                        />
+                        {/* Status Indicator */}
+                        <View className="absolute bottom-1 right-1 w-6 h-6 bg-green-500 rounded-full border-4 border-[#121212]" />
+                    </View>
+
+                    <Text style={{ color: currentTheme.colors.text.primary }} className="text-2xl font-bold mb-1">
+                        {user?.user_metadata?.full_name || 'Guest User'}
+                    </Text>
+                    <Text style={{ color: currentTheme.colors.text.secondary }} className="text-sm">
+                        {user?.email || 'Sign in to sync your data'}
+                    </Text>
+                </Animated.View>
+
+                {/* Menu Items */}
+                <View className="px-6 space-y-4">
+                    {menuItems.map((item, index) => (
+                        <Animated.View
+                            key={index}
+                            entering={FadeInDown.delay(200 + (index * 100)).springify()}
+                        >
+                            <TouchableOpacity
+                                onPress={item.action}
+                                style={{ backgroundColor: 'rgba(255,255,255,0.03)' }}
+                                className="flex-row items-center p-4 rounded-2xl border border-white/5 active:bg-white/5"
+                            >
+                                <View className="w-10 h-10 rounded-full bg-white/5 items-center justify-center mr-4">
+                                    <Feather name={item.icon as any} size={20} color={currentTheme.colors.text.primary} />
+                                </View>
+                                <View className="flex-1">
+                                    <Text style={{ color: currentTheme.colors.text.primary, fontFamily: 'Outfit-Medium' }} className="text-base">
+                                        {item.label}
+                                    </Text>
+                                    {item.value && (
+                                        <Text style={{ color: currentTheme.colors.primary, fontFamily: 'Outfit-Bold' }} className="text-[10px] mt-0.5 uppercase tracking-wider">
+                                            {item.value}
+                                        </Text>
+                                    )}
+                                </View>
+                                <Feather name="chevron-right" size={20} color={currentTheme.colors.text.secondary} />
+                            </TouchableOpacity>
+                        </Animated.View>
+                    ))}
+                </View>
+
+                {/* Bottom Spacer for Sticky Button */}
+                <View className="h-32" />
+
+            </ScrollView>
+
+            {/* Sticky Logout Button */}
+            <Animated.View
+                entering={FadeInDown.delay(600).springify()}
+                style={{
+                    backgroundColor: currentTheme.colors.background,
+                    borderTopWidth: 1,
+                    borderTopColor: 'rgba(255,255,255,0.05)',
+                }}
+                className="absolute bottom-0 w-full px-6 py-6 pb-10"
+            >
+                <TouchableOpacity
+                    onPress={handleSignOut}
+                    className="w-full py-4 rounded-2xl border border-red-500/30 bg-red-500/10 items-center active:bg-red-500/20"
+                >
+                    <Text className="text-red-500 font-bold text-base tracking-wide" style={{ fontFamily: 'Outfit-Bold' }}>Log Out</Text>
+                </TouchableOpacity>
+            </Animated.View>
+        </View>
+    );
+}
