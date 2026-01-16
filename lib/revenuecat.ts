@@ -5,10 +5,9 @@ import Purchases, {
     PurchasesPackage
 } from 'react-native-purchases';
 
-// NOTE: Replace these with your actual RevenueCat API keys
 const API_KEYS = {
-  apple: 'test_kQJkXUqJprhvrJwTZHFYHQDWjUb', 
-  google: 'test_kQJkXUqJprhvrJwTZHFYHQDWjUb',
+  apple: 'appl_placeholder', // Update if iOS is needed
+  google: 'goog_enJTuTjAmVbNUzcVHlJaBCjhYDc',
 };
 
 class RevenueCatService {
@@ -23,6 +22,21 @@ class RevenueCatService {
     } else if (Platform.OS === 'android') {
        if (API_KEYS.google) Purchases.configure({ apiKey: API_KEYS.google });
     }
+
+    // DEBUG: Check if Google Play allows us to fetch the yearly product directly
+    try {
+        const products = await Purchases.getProducts(['memories_pro_monthly:memories-pro-yearly', 'memories_pro_monthly:memories-pro-monthly']);
+        console.log("🕵️‍♂️ [DEBUG] Direct Product Fetch Result:", JSON.stringify(products, null, 2));
+        if (products.length === 0) {
+            console.error("❌ [DEBUG] Google Play returned NO products. This means the IDs are invalid or not available to this user account.");
+        } else if (products.length === 1) {
+            console.warn("⚠️ [DEBUG] Google Play only returned 1 product. The other is invalid/inactive.", products[0].identifier);
+        } else {
+            console.log("✅ [DEBUG] Google Play sees BOTH products! The issue is likely in the RevenueCat 'Offering' setup.");
+        }
+    } catch (e) {
+        console.error("❌ [DEBUG] Failed to fetch products directly:", e);
+    }
   }
 
   /**
@@ -31,8 +45,13 @@ class RevenueCatService {
   static async getOfferings(): Promise<PurchasesOffering | null> {
     try {
       const offerings = await Purchases.getOfferings();
+      console.log("📦 [RevenueCat] ALL Offerings fetched:", JSON.stringify(offerings, null, 2));
+      
       if (offerings.current !== null) {
+        console.log("✅ [RevenueCat] Current Offering found:", offerings.current.identifier);
         return offerings.current;
+      } else {
+        console.warn("⚠️ [RevenueCat] No 'current' offering configured in RevenueCat dashboard.");
       }
       return null;
     } catch (e) {

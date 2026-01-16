@@ -12,17 +12,29 @@ export async function requestNotificationPermissions() {
 }
 
 export async function cancelEventNotifications(eventId: string) {
-    const scheduled = await Notifications.getAllScheduledNotificationsAsync();
-    const eventNotifications = scheduled.filter(n => n.content.data?.eventId === eventId);
-    
-    for (const n of eventNotifications) {
-        await Notifications.cancelScheduledNotificationAsync(n.identifier);
+    try {
+        const scheduled = await Notifications.getAllScheduledNotificationsAsync();
+        const eventNotifications = scheduled.filter(n => n.content.data?.eventId === eventId);
+        
+        if (eventNotifications.length > 0) {
+            await Promise.all(eventNotifications.map(n => 
+                Notifications.cancelScheduledNotificationAsync(n.identifier)
+            ));
+            console.log(`[Notifications] Cancelled ${eventNotifications.length} notifications for event ${eventId}`);
+        }
+    } catch (error) {
+        console.warn("[Notifications] Failed to cancel notifications:", error);
+        // Don't throw, so we don't block the delete/update process
     }
 }
 
 export async function scheduleEventNotifications(eventId: string, title: string, dateStr: string, isTimeCapsule: boolean = false) {
     const hasPermission = await requestNotificationPermissions();
     if (!hasPermission) return;
+
+    // Check notification permissions again just to be safe
+    // Cancel any existing notifications for this event first to avoid duplicates
+    await cancelEventNotifications(eventId);
 
     const eventDate = new Date(dateStr);
     const now = new Date();
@@ -124,7 +136,7 @@ export async function scheduleEventNotifications(eventId: string, title: string,
     // 3. Days
     // 1, 7, 50, 100, 500, then every 1000
     // Lifetime: 100 Years = ~36,500 days
-    const dayMilestones = [1, 7, 50, 100, 500];
+    const dayMilestones = [1, 2, 3, 4, 5, 6, 7, 50, 100, 500];
     for (let d = 1000; d <= 36500; d += 1000) {
         dayMilestones.push(d);
     }

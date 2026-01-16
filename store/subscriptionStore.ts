@@ -15,7 +15,7 @@ interface SubscriptionState {
 }
 
 export const useSubscriptionStore = create<SubscriptionState>((set, get) => ({
-  isPro: true, // Default to true for everyone
+  isPro: false,
   offerings: null,
   isLoading: false,
   isRestoring: false,
@@ -23,15 +23,15 @@ export const useSubscriptionStore = create<SubscriptionState>((set, get) => ({
   initialize: async () => {
     set({ isLoading: true });
     try {
-        // Init happens in _layout, but we can double check or get offerings here
-        // const offerings = await RevenueCatService.getOfferings();
-        // const customerInfo = await RevenueCatService.getCustomerInfo();
+        await RevenueCatService.init();
+        const offerings = await RevenueCatService.getOfferings();
+        const customerInfo = await RevenueCatService.getCustomerInfo();
         
-        // if (customerInfo) {
-        //     get().updateCustomerInfo(customerInfo);
-        // }
+        if (customerInfo) {
+            get().updateCustomerInfo(customerInfo);
+        }
         
-        // set({ offerings });
+        set({ offerings });
     } catch (e) {
         console.error("Subscription store init error", e);
     } finally {
@@ -40,10 +40,10 @@ export const useSubscriptionStore = create<SubscriptionState>((set, get) => ({
   },
 
   updateCustomerInfo: (customerInfo: CustomerInfo) => {
-    // Check for "pro" entitlement. Replace "pro" with your actual entitlement ID from RevenueCat
+    // Check for "pro" entitlement. This must match your RevenueCat configuration.
+    // If your entitlement ID is different (e.g. "premium"), change it here.
     const entitlement = customerInfo.entitlements.active['pro']; 
-    // set({ isPro: !!entitlement });
-    set({ isPro: true }); // Forced Pro for everyone
+    set({ isPro: !!entitlement });
   },
 
   purchasePackage: async (pack: PurchasesPackage) => {

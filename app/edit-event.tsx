@@ -2,6 +2,7 @@ import { AestheticDatePicker, AestheticTimePicker } from '@/components/DateTimeP
 import { FullScreenLoader } from '@/components/FullScreenLoader';
 import { ImageModal } from '@/components/ImageModal';
 import { useEventStore } from '@/store/eventStore';
+import { useSubscriptionStore } from '@/store/subscriptionStore';
 import { useThemeStore } from '@/store/themeStore';
 import { cancelEventNotifications, scheduleEventNotifications } from '@/utils/notifications';
 import { Feather } from '@expo/vector-icons';
@@ -23,6 +24,7 @@ export default function EditEvent() {
     const { id } = useLocalSearchParams();
     const currentTheme = useThemeStore((state) => state.currentTheme);
     const { events, updateEvent } = useEventStore();
+    const { isPro } = useSubscriptionStore();
 
     // Find the event to edit
     const eventToEdit = events.find(e => e.id === id);
@@ -62,6 +64,11 @@ export default function EditEvent() {
     };
 
     const pickImage = async () => {
+        if (!isPro) {
+            router.push('/subscription');
+            return;
+        }
+
         if (selectedImages.length >= 4) {
             Alert.alert("Limit Reached", "You can only add up to 4 photos.");
             return;
@@ -130,8 +137,8 @@ export default function EditEvent() {
                     <Text style={{ color: currentTheme.colors.text.secondary }} className="text-lg">Cancel</Text>
                 </TouchableOpacity>
                 <Text style={{ color: currentTheme.colors.text.primary }} className="text-xl font-bold">Edit Memory</Text>
-                <TouchableOpacity onPress={handleUpdate}>
-                    <Text style={{ color: currentTheme.colors.primary }} className="text-lg font-bold">Update</Text>
+                <TouchableOpacity onPress={handleUpdate} disabled={loading}>
+                    <Text style={{ color: loading ? currentTheme.colors.text.secondary : currentTheme.colors.primary }} className="text-lg font-bold">Update</Text>
                 </TouchableOpacity>
             </View>
 
@@ -246,7 +253,8 @@ export default function EditEvent() {
             <View className="p-6 border-t border-white/5">
                 <TouchableOpacity
                     onPress={handleUpdate}
-                    style={{ backgroundColor: currentTheme.colors.button.primary }}
+                    disabled={loading}
+                    style={{ backgroundColor: loading ? currentTheme.colors.button.secondary : currentTheme.colors.button.primary }}
                     className="w-full py-4 rounded-xl items-center"
                 >
                     <Text style={{ color: currentTheme.colors.background }} className="font-bold text-lg">Update Memory</Text>

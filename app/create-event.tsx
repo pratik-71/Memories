@@ -105,7 +105,8 @@ export default function CreateEvent() {
             router.back();
         } catch (error: any) {
             if (error.message && error.message.includes("Limit Reached")) {
-                setLimitModalVisible(true);
+                // User requirement: Open subscription modal (page) directly if limit reached
+                router.push('/subscription');
             } else {
                 Alert.alert("Error", "Failed to save memory. Please try again.");
             }
@@ -125,8 +126,8 @@ export default function CreateEvent() {
                     <Text style={{ color: currentTheme.colors.text.secondary }} className="text-lg font-[Outfit-Medium]">Cancel</Text>
                 </TouchableOpacity>
                 <Text style={{ color: currentTheme.colors.text.primary, fontFamily: 'Outfit-Bold' }} className="text-xl">New Memory</Text>
-                <TouchableOpacity onPress={handleSave}>
-                    <Text style={{ color: currentTheme.colors.primary, fontFamily: 'Outfit-Bold' }} className="text-lg">Save</Text>
+                <TouchableOpacity onPress={handleSave} disabled={loading}>
+                    <Text style={{ color: loading ? currentTheme.colors.text.secondary : currentTheme.colors.primary, fontFamily: 'Outfit-Bold' }} className="text-lg">Save</Text>
                 </TouchableOpacity>
             </View>
 

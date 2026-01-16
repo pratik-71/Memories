@@ -1,16 +1,16 @@
 import { useSubscriptionStore } from '@/store/subscriptionStore';
 import { useThemeStore } from '@/store/themeStore';
 import { Feather } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
-import { ActivityIndicator, Alert, Dimensions, Image, ScrollView, Text, TouchableOpacity, View } from 'react-native';
-import { PurchasesPackage } from 'react-native-purchases';
+import { Dimensions, Image, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 
 const { width } = Dimensions.get('window');
 
 export default function Subscription() {
+    const params = useLocalSearchParams();
     const router = useRouter();
     const currentTheme = useThemeStore((state) => state.currentTheme);
     const {
@@ -26,33 +26,13 @@ export default function Subscription() {
         initialize();
     }, []);
 
-    const handlePurchase = async (pack: any) => {
-        if (isPro) return;
-        const success = await purchasePackage(pack);
-        if (success) {
-            Alert.alert("Success", "You are now a Premium member!");
-            router.back();
-        }
-    };
-
-    const handleRestore = async () => {
-        const success = await restorePurchases();
-        if (success) {
-            Alert.alert("Success", "Purchases restored successfully!");
-        } else {
-            Alert.alert("Notice", "No purchases to restore found.");
-        }
-    };
-
-    const availablePackages = offerings?.availablePackages || [];
-
     return (
         <View style={{ backgroundColor: currentTheme.colors.background }} className="flex-1">
             <StatusBar style="light" />
 
             <ScrollView contentContainerStyle={{ flexGrow: 1 }} showsVerticalScrollIndicator={false}>
                 {/* Close & Restore Header */}
-                <View className="px-6 pt-16 pb-4 flex-row justify-between items-center z-10">
+                <View className="px-6 pt-16 pb-0 flex-row justify-between items-center z-10">
                     <TouchableOpacity
                         onPress={() => router.back()}
                         style={{ backgroundColor: 'rgba(255,255,255,0.1)' }}
@@ -60,25 +40,20 @@ export default function Subscription() {
                     >
                         <Feather name="x" size={20} color="white" />
                     </TouchableOpacity>
-                    <TouchableOpacity onPress={handleRestore}>
-                        <Text style={{ fontFamily: 'Outfit-Medium', color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', fontSize: 12, letterSpacing: 1 }}>
-                            Restore
-                        </Text>
-                    </TouchableOpacity>
                 </View>
 
                 {/* Main Content */}
-                <View className="flex-1 items-center pt-4 pb-20 px-6">
+                <View className="flex-1 items-center pt-2 pb-10 px-6">
                     {/* Hero Image */}
                     <Animated.View
                         entering={FadeInDown.delay(200).springify()}
-                        className="items-center justify-center mb-8 shadow-2xl shadow-black"
+                        className="items-center justify-center mb-6 shadow-2xl shadow-black"
                     >
                         <Image
                             source={require('@/assets/onboarding/subscription.png')}
                             style={{
-                                width: width * 0.75,
-                                height: width * 0.75,
+                                width: width * 1.2,
+                                height: width * 0.45,
                                 opacity: 0.9
                             }}
                             resizeMode="contain"
@@ -86,78 +61,110 @@ export default function Subscription() {
                     </Animated.View>
 
                     {/* Text Content */}
-                    <Animated.View entering={FadeInDown.delay(300).springify()} className="items-center w-full mb-16">
-                        <Text style={{ fontFamily: 'Outfit-Bold', color: 'white' }} className="text-4xl text-center mb-3">
-                            Memories Premium
+                    <Animated.View entering={FadeInDown.delay(300).springify()} className="items-center w-full mb-8">
+                        <Text style={{ fontFamily: 'Outfit-Bold', color: 'white' }} className="text-3xl text-center mb-2">
+                            Unlock Unlimited
                         </Text>
-                        <Text style={{ fontFamily: 'Outfit-Regular', color: 'rgba(255,255,255,0.5)' }} className="text-center text-lg leading-7 px-4">
-                            Unlock the full experience.{'\n'}Unlimited moments.
+                        <Text style={{ fontFamily: 'Outfit-Regular', color: 'rgba(255,255,255,0.5)' }} className="text-center text-base leading-6 px-4">
+                            Create unlimited memories.{'\n'}Keep your moments forever.
                         </Text>
                     </Animated.View>
 
-                    {/* Packages / Pricing */}
-                    <Animated.View entering={FadeInDown.delay(400).springify()} className="w-full space-y-4 gap-4">
-                        {isLoading ? (
-                            <View className="py-12 items-center">
-                                <ActivityIndicator size="small" color="white" />
-                            </View>
-                        ) : isPro ? (
-                            <View
-                                style={{ backgroundColor: '#18181b', borderColor: 'rgba(255,255,255,0.1)' }}
-                                className="w-full py-6 rounded-3xl items-center border"
-                            >
-                                <Feather name="check-circle" size={32} color="white" style={{ marginBottom: 12 }} />
-                                <Text style={{ fontFamily: 'Outfit-Bold', color: 'white' }} className="text-xl">
-                                    Premium Unlocked
-                                </Text>
-                            </View>
-                        ) : availablePackages.length > 0 ? (
-                            availablePackages.map((pack: PurchasesPackage) => {
-                                const isAnnual = pack.packageType === 'ANNUAL';
+                    {/* Loading State */}
+                    {isLoading || !offerings ? (
+                        <View className="items-center py-10">
+                            <Text style={{ fontFamily: 'Outfit-Regular', color: 'rgba(255,255,255,0.5)' }}>Loading offers...</Text>
+                        </View>
+                    ) : (
+                        <View className="w-full gap-4 pb-10">
+                            {offerings.availablePackages.map((pack, index) => {
+                                const isAnnual = pack.packageType === "ANNUAL";
+
+                                // flexible content based on plan type
+                                const features = isAnnual ? [
+                                    "Save 20% vs monthly",
+                                    "Cancel anytime",
+                                ] : [
+                                    "One-time payment",
+                                    "30 days access"
+                                ];
+
                                 return (
-                                    <TouchableOpacity
+                                    <Animated.View
                                         key={pack.identifier}
-                                        activeOpacity={0.9}
-                                        onPress={() => handlePurchase(pack)}
-                                        style={{
-                                            backgroundColor: isAnnual ? 'white' : 'rgba(255,255,255,0.05)',
-                                            borderColor: isAnnual ? 'white' : 'rgba(255,255,255,0.1)',
-                                            borderWidth: 1
-                                        }}
-                                        className="w-full p-6 rounded-3xl flex-row items-center justify-between"
+                                        entering={FadeInDown.delay(400 + (index * 100)).springify()}
                                     >
-                                        <View>
-                                            <Text style={{
-                                                fontFamily: 'Outfit-Bold',
-                                                color: isAnnual ? 'black' : 'white',
-                                                fontSize: 18
-                                            }}>
-                                                {pack.product.title}
-                                            </Text>
+                                        <TouchableOpacity
+                                            onPress={() => purchasePackage(pack)}
+                                            style={{
+                                                backgroundColor: isAnnual ? 'rgba(250, 250, 250, 0.08)' : 'rgba(255,255,255,0.03)',
+                                                borderColor: isAnnual ? currentTheme.colors.primary : 'rgba(255,255,255,0.1)',
+                                                borderWidth: isAnnual ? 2 : 1
+                                            }}
+                                            className={`p-5 rounded-3xl w-full relative ${isAnnual ? 'shadow-lg shadow-white/10' : ''}`}
+                                        >
                                             {isAnnual && (
-                                                <Text style={{ fontFamily: 'Outfit-Medium', color: 'rgba(0,0,0,0.5)', marginTop: 4, fontSize: 12 }}>
-                                                    BEST VALUE
-                                                </Text>
+                                                <View className="absolute -top-3 right-5 bg-white px-3 py-1 rounded-full">
+                                                    <Text style={{ fontFamily: 'Outfit-Bold', color: 'black', fontSize: 10 }}>
+                                                        BEST VALUE
+                                                    </Text>
+                                                </View>
                                             )}
-                                        </View>
-                                        <Text style={{
-                                            fontFamily: 'Outfit-Bold',
-                                            color: isAnnual ? 'black' : 'white',
-                                            fontSize: 18
-                                        }}>
-                                            {pack.product.priceString}
-                                        </Text>
-                                    </TouchableOpacity>
-                                );
-                            })
-                        ) : (
-                            // Loading Skeleton / Fallback state
-                            <View className="w-full space-y-4 opacity-50">
-                                <View className="w-full h-20 bg-white/5 rounded-3xl animate-pulse" />
-                                <View className="w-full h-20 bg-white/5 rounded-3xl animate-pulse" />
-                            </View>
-                        )}
-                    </Animated.View>
+
+                                            <View className="flex-row justify-between items-start mb-4">
+                                                <View className="flex-1 pr-4">
+                                                    <Text style={{ fontFamily: 'Outfit-Bold', color: 'white' }} className="text-xl mb-1">
+                                                        {pack.product.title.replace(/\s*\(.*?\)\s*/g, '')}
+                                                    </Text>
+                                                    <View>
+                                                        <Text style={{ fontFamily: 'Outfit-Bold', color: currentTheme.colors.primary }} className="text-2xl">
+                                                            {pack.product.priceString}
+                                                            <Text style={{ fontFamily: 'Outfit-Regular', color: 'rgba(255,255,255,0.3)', fontSize: 14 }}>
+                                                                {isAnnual ? '/year' : '/mo'}
+                                                            </Text>
+                                                        </Text>
+                                                        {isAnnual && pack.product.price > 0 && (
+                                                            <Text style={{ fontFamily: 'Outfit-Medium', color: '#4ade80' }} className="text-sm mt-1">
+                                                                Just {new Intl.NumberFormat(undefined, {
+                                                                    style: 'currency',
+                                                                    currency: pack.product.currencyCode,
+                                                                    maximumFractionDigits: 2
+                                                                }).format(pack.product.price / 12)}/mo
+                                                            </Text>
+                                                        )}
+                                                    </View>
+                                                </View>
+                                            </View>
+
+                                            {/* Inline Features */}
+                                            <View className="gap-2">
+                                                {features.map((item, i) => (
+                                                    <View key={i} className="flex-row items-center">
+                                                        <Feather name="check" size={12} color={isAnnual ? "#4ade80" : "rgba(255,255,255,0.5)"} />
+                                                        <Text style={{ fontFamily: 'Outfit-Regular', color: 'rgba(255,255,255,0.6)' }} className="text-sm ml-2">
+                                                            {item}
+                                                        </Text>
+                                                    </View>
+                                                ))}
+                                            </View>
+                                        </TouchableOpacity>
+                                    </Animated.View>
+                                )
+                            })}
+
+                            {/* Restore Purchases */}
+                            <Animated.View entering={FadeInDown.delay(600).springify()} className="items-center mt-4 mb-6">
+                                <TouchableOpacity
+                                    onPress={restorePurchases}
+                                    className="py-2 px-4"
+                                >
+                                    <Text style={{ fontFamily: 'Outfit-Medium', color: 'rgba(255,255,255,0.4)' }} className="text-xs">
+                                        Restore Purchases
+                                    </Text>
+                                </TouchableOpacity>
+                            </Animated.View>
+                        </View>
+                    )}
                 </View>
             </ScrollView>
         </View>

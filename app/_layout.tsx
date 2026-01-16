@@ -2,7 +2,7 @@ import { supabase } from '@/lib/supabase';
 import { useSubscriptionStore } from '@/store/subscriptionStore';
 import { DarkTheme, ThemeProvider } from '@react-navigation/native';
 import * as Notifications from 'expo-notifications';
-import { Stack } from 'expo-router';
+import { Stack, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import * as SystemUI from 'expo-system-ui';
 import { useEffect } from 'react';
@@ -44,6 +44,24 @@ export default function RootLayout() {
     'Outfit-Medium': Outfit_500Medium,
     'Outfit-Bold': Outfit_700Bold,
   });
+
+  const router = useRouter();
+
+  useEffect(() => {
+    // Listener for when a user creates/taps a notification
+    const subscription = Notifications.addNotificationResponseReceivedListener(response => {
+      const eventId = response.notification.request.content.data.eventId;
+      if (eventId) {
+        // Navigate to sideshow first. 
+        // Logic in slideshow will determine if it should redirect to details (no images) or play.
+        router.push({ pathname: "/event/slideshow/[id]", params: { id: String(eventId) } } as any);
+      }
+    });
+
+    return () => {
+      subscription.remove();
+    };
+  }, []);
 
 
 
@@ -156,6 +174,16 @@ export default function RootLayout() {
           options={{
             headerShown: false,
             animation: 'slide_from_right'
+          }}
+        />
+
+        {/* Slideshow Page */}
+        <Stack.Screen
+          name="event/slideshow/[id]"
+          options={{
+            headerShown: false,
+            animation: 'fade',
+            presentation: 'transparentModal'
           }}
         />
 

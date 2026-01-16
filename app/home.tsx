@@ -1,5 +1,4 @@
 import { FullScreenLoader } from '@/components/FullScreenLoader';
-import { LimitReachedModal } from '@/components/LimitReachedModal';
 import { TimeCapsuleModal } from '@/components/TimeCapsuleModal';
 import { SpecialEvent, useEventStore } from '@/store/eventStore';
 import { useSubscriptionStore } from '@/store/subscriptionStore';
@@ -185,7 +184,6 @@ export default function Home() {
     const events = useEventStore((state) => state.events);
     const fetchEvents = useEventStore((state) => state.fetchEvents);
     const { isPro } = useSubscriptionStore();
-    const [limitModalVisible, setLimitModalVisible] = useState(false);
     const [lockedEvent, setLockedEvent] = useState<SpecialEvent | null>(null);
 
     const [loading, setLoading] = useState(true);
@@ -199,6 +197,16 @@ export default function Home() {
         load();
     }, []);
 
+    // Auto-open subscription for free users after delay
+    useEffect(() => {
+        if (!loading && !isPro) {
+            const timer = setTimeout(() => {
+                router.push('/subscription');
+            }, 2000); // 2 seconds delay
+            return () => clearTimeout(timer);
+        }
+    }, [loading, isPro]);
+
     const [searchQuery, setSearchQuery] = useState('');
 
     const filteredEvents = events.filter(event =>
@@ -206,8 +214,9 @@ export default function Home() {
     );
 
     const handleCreateEvent = () => {
-        if (!isPro && events.length >= 3) {
-            setLimitModalVisible(true);
+        if (!isPro && events.length >= 1) {
+            // setTopUpVisible(true);
+            router.push({ pathname: '/subscription', params: { limitReached: 'true' } });
         } else {
             router.push('/create-event');
         }
@@ -341,7 +350,6 @@ export default function Home() {
             )}
 
             {/* Modals */}
-            <LimitReachedModal visible={limitModalVisible} onClose={() => setLimitModalVisible(false)} />
             <TimeCapsuleModal event={lockedEvent} onClose={() => setLockedEvent(null)} />
         </View>
     );

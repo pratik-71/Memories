@@ -3,6 +3,7 @@ import { ImageModal } from '@/components/ImageModal';
 import { StatusModal } from '@/components/StatusModal';
 import { supabase } from '@/lib/supabase';
 import { useEventStore } from '@/store/eventStore';
+import { useSubscriptionStore } from '@/store/subscriptionStore';
 import { scheduleEventNotifications } from '@/utils/notifications';
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -63,12 +64,17 @@ const calculateDetailedDuration = (event: any) => {
 export default function EventDetails() {
     const { id } = useLocalSearchParams();
     const router = useRouter();
-    const { events, deleteEvent, togglePauseEvent, completeEvent, fetchEventDetails } = useEventStore();
+    const { events, deleteEvent, togglePauseEvent, completeEvent, fetchEventDetails, addEvent } = useEventStore();
     const [deleteModalVisible, setDeleteModalVisible] = useState(false);
     const [isExpanded, setIsExpanded] = useState(false);
     const [previewImage, setPreviewImage] = useState<string | null>(null);
+    const [isJoining, setIsJoining] = useState(false);
 
-    // Status Modal State
+    // For FullScreenLoader during actions
+    const [isProcessing, setIsProcessing] = useState(false);
+
+
+
     const [statusModal, setStatusModal] = useState<{ visible: boolean, type: 'success' | 'error', title: string, message: string }>({
         visible: false,
         type: 'success',
@@ -116,16 +122,13 @@ export default function EventDetails() {
         }
     }, [event]);
 
-    // -- MOVED HOOKS START --
-    // These hooks were previously below the conditional return, causing the error.
-    const [isJoining, setIsJoining] = useState(false);
     const isOwner = event ? event.user_id === currentUserId : false;
-    const { addEvent } = useEventStore(); // Re-added addEvent
 
     // Time Capsule Logic
     const isLocked = event && duration ? (event.isTimeCapsule && !duration.isPast) : false;
+    const { isPro } = useSubscriptionStore(); // Get subscription status - MOVED UP
 
-    if (!event || !duration) {
+    if (!event || !duration || isProcessing) {
         return (
             <FullScreenLoader />
         );
@@ -137,9 +140,17 @@ export default function EventDetails() {
 
     const confirmDelete = async () => {
         if (typeof id === 'string') {
-            await deleteEvent(id);
-            setDeleteModalVisible(false);
-            router.back();
+            setIsProcessing(true);
+            try {
+                await deleteEvent(id);
+                setDeleteModalVisible(false);
+                // navigate back with potential param for toast on home? 
+                // For now just back.
+                router.back();
+            } catch (e: any) {
+                Alert.alert("Error", e.message || 'Delete failed');
+                setIsProcessing(false);
+            }
         }
     };
 
@@ -159,19 +170,41 @@ export default function EventDetails() {
 
     const handlePauseResume = async () => {
         if (typeof id === 'string') {
-            await togglePauseEvent(id);
+            setIsProcessing(true);
+            try {
+                const willPause = event.status !== 'paused';
+                await togglePauseEvent(id);
+            } catch (e: any) {
+                Alert.alert("Error", e.message);
+            } finally {
+                setIsProcessing(false);
+            }
         }
     };
 
     const handleComplete = async () => {
         if (typeof id === 'string') {
-            await completeEvent(id);
+            setIsProcessing(true);
+            try {
+                await completeEvent(id);
+            } catch (e: any) {
+                Alert.alert("Error", e.message);
+            } finally {
+                setIsProcessing(false);
+            }
         }
     };
 
     // Re-declaring handleJoin here (logic only, state is above) so it can use 'event' safely
     const handleJoin = async () => {
         if (isJoining || !event) return;
+
+        // Check limit for shared events too
+        if (!isPro && events.length >= 1) {
+            Alert.alert("Limit Reached", "Free limit reached. Top up for more.");
+            return;
+        }
+
         setIsJoining(true); // Using state declared above
         try {
             const newEventId = await addEvent({
@@ -459,7 +492,6 @@ export default function EventDetails() {
 
 
 
-            {/* Custom Delete Modal */}
             {
                 deleteModalVisible && (
                     <View className="absolute inset-0 z-50 flex-1 items-center justify-center bg-black/80 px-4">
