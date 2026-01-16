@@ -6,8 +6,8 @@ import Purchases, {
 } from 'react-native-purchases';
 
 const API_KEYS = {
-  apple: 'appl_placeholder', // Update if iOS is needed
-  google: 'goog_enJTuTjAmVbNUzcVHlJaBCjhYDc',
+  apple: process.env.EXPO_PUBLIC_REVENUECAT_APPLE_API_KEY || 'appl_placeholder',
+  google: process.env.EXPO_PUBLIC_REVENUECAT_GOOGLE_API_KEY || 'goog_placeholder',
 };
 
 class RevenueCatService {
