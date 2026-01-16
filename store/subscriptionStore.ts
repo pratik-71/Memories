@@ -7,11 +7,13 @@ interface SubscriptionState {
   offerings: PurchasesOffering | null;
   isLoading: boolean;
   isRestoring: boolean;
+  hasReviewed: boolean;
   
   initialize: () => Promise<void>;
   updateCustomerInfo: (customerInfo: CustomerInfo) => void;
   purchasePackage: (pack: PurchasesPackage) => Promise<boolean>;
   restorePurchases: () => Promise<boolean>;
+  setReviewed: () => void;
 }
 
 export const useSubscriptionStore = create<SubscriptionState>((set, get) => ({
@@ -19,6 +21,9 @@ export const useSubscriptionStore = create<SubscriptionState>((set, get) => ({
   offerings: null,
   isLoading: false,
   isRestoring: false,
+  hasReviewed: false,
+
+  setReviewed: () => set({ hasReviewed: true }),
 
   initialize: async () => {
     set({ isLoading: true });

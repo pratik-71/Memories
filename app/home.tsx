@@ -1,5 +1,6 @@
 import { FullScreenLoader } from '@/components/FullScreenLoader';
 import { TimeCapsuleModal } from '@/components/TimeCapsuleModal';
+import { useMemoryLimit } from '@/hooks/useMemoryLimit';
 import { SpecialEvent, useEventStore } from '@/store/eventStore';
 import { useSubscriptionStore } from '@/store/subscriptionStore';
 import { useThemeStore } from '@/store/themeStore';
@@ -178,12 +179,13 @@ const LiveEventCard = React.memo(({ item, index, onLockedPress }: { item: Specia
     );
 });
 
+
 export default function Home() {
     const router = useRouter();
-    const currentTheme = useThemeStore((state) => state.currentTheme);
     const events = useEventStore((state) => state.events);
     const fetchEvents = useEventStore((state) => state.fetchEvents);
-    const { isPro } = useSubscriptionStore();
+    const { isPro, hasReviewed } = useSubscriptionStore();
+    const limit = useMemoryLimit();
     const [lockedEvent, setLockedEvent] = useState<SpecialEvent | null>(null);
 
     const [loading, setLoading] = useState(true);
@@ -197,15 +199,15 @@ export default function Home() {
         load();
     }, []);
 
-    // Auto-open subscription for free users after delay
+    // Auto-open subscription for free users every time they visit home
     useEffect(() => {
-        if (!loading && !isPro) {
+        if (!loading && !isPro && !hasReviewed) {
             const timer = setTimeout(() => {
                 router.push('/subscription');
-            }, 2000); // 2 seconds delay
+            }, 1500);
             return () => clearTimeout(timer);
         }
-    }, [loading, isPro]);
+    }, [loading, isPro, hasReviewed]);
 
     const [searchQuery, setSearchQuery] = useState('');
 
@@ -214,8 +216,7 @@ export default function Home() {
     );
 
     const handleCreateEvent = () => {
-        if (!isPro && events.length >= 1) {
-            // setTopUpVisible(true);
+        if (events.length >= limit) {
             router.push({ pathname: '/subscription', params: { limitReached: 'true' } });
         } else {
             router.push('/create-event');

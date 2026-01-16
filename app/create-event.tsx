@@ -1,7 +1,6 @@
 import { AestheticDatePicker, AestheticTimePicker } from '@/components/DateTimePicker';
 import { FullScreenLoader } from '@/components/FullScreenLoader';
 import { ImageModal } from '@/components/ImageModal';
-import { LimitReachedModal } from '@/components/LimitReachedModal';
 import { useEventStore } from '@/store/eventStore';
 import { useSubscriptionStore } from '@/store/subscriptionStore';
 import { useThemeStore } from '@/store/themeStore';
@@ -33,7 +32,6 @@ export default function CreateEvent() {
     // Independent visibility states
     const [datePickerVisible, setDatePickerVisible] = useState(false);
     const [timePickerVisible, setTimePickerVisible] = useState(false);
-    const [limitModalVisible, setLimitModalVisible] = useState(false);
 
     // Image states
     const [selectedImages, setSelectedImages] = useState<string[]>([]);
@@ -303,11 +301,6 @@ export default function CreateEvent() {
                 onClose={() => setTimePickerVisible(false)}
                 onSelect={handleTimeSelect}
                 currentDate={date}
-            />
-
-            <LimitReachedModal
-                visible={limitModalVisible}
-                onClose={() => setLimitModalVisible(false)}
             />
 
             <ImageModal

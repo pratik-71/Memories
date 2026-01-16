@@ -1,9 +1,9 @@
 import { FullScreenLoader } from '@/components/FullScreenLoader';
 import { ImageModal } from '@/components/ImageModal';
 import { StatusModal } from '@/components/StatusModal';
+import { useMemoryLimit } from '@/hooks/useMemoryLimit';
 import { supabase } from '@/lib/supabase';
 import { useEventStore } from '@/store/eventStore';
-import { useSubscriptionStore } from '@/store/subscriptionStore';
 import { scheduleEventNotifications } from '@/utils/notifications';
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -64,6 +64,7 @@ const calculateDetailedDuration = (event: any) => {
 export default function EventDetails() {
     const { id } = useLocalSearchParams();
     const router = useRouter();
+    const limit = useMemoryLimit();
     const { events, deleteEvent, togglePauseEvent, completeEvent, fetchEventDetails, addEvent } = useEventStore();
     const [deleteModalVisible, setDeleteModalVisible] = useState(false);
     const [isExpanded, setIsExpanded] = useState(false);
@@ -126,7 +127,6 @@ export default function EventDetails() {
 
     // Time Capsule Logic
     const isLocked = event && duration ? (event.isTimeCapsule && !duration.isPast) : false;
-    const { isPro } = useSubscriptionStore(); // Get subscription status - MOVED UP
 
     if (!event || !duration || isProcessing) {
         return (
@@ -200,8 +200,8 @@ export default function EventDetails() {
         if (isJoining || !event) return;
 
         // Check limit for shared events too
-        if (!isPro && events.length >= 1) {
-            Alert.alert("Limit Reached", "Free limit reached. Top up for more.");
+        if (events.length >= limit) {
+            Alert.alert("Limit Reached", "Memory limit reached.");
             return;
         }
 

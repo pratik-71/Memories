@@ -116,11 +116,13 @@ export const useEventStore = create<EventState>()(
         set({ isLoading: true, error: null });
         try {
             // 1. FREE PLAN LIMIT CHECK
-            const isPro = useSubscriptionStore.getState().isPro; 
+            const isPro = useSubscriptionStore.getState().isPro;
+            const hasReviewed = useSubscriptionStore.getState().hasReviewed;
+            const limit = isPro ? 9999 : (hasReviewed ? 2 : 1);
             const currentCount = get().events.length;
             
-            if (!isPro && currentCount >= 1) {
-                throw new Error("Free Plan Limit Reached. You can only create 1 event.");
+            if (currentCount >= limit) {
+                throw new Error(`Limit Reached. ${isPro ? '' : hasReviewed ? 'You can create up to 2 memories. ' : 'You can only create 1 memory. '}Upgrade for unlimited.`);
             }
 
             const { data: { user } = {} } = await supabase.auth.getUser();

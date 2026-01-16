@@ -1,8 +1,10 @@
+import { useSubscriptionStore } from '@/store/subscriptionStore';
 import { useThemeStore } from '@/store/themeStore';
 import { Feather } from '@expo/vector-icons';
 import { GoogleSignin } from '@react-native-google-signin/google-signin';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import * as StoreReview from 'expo-store-review';
 import { useEffect, useState } from 'react';
 import { Alert, Dimensions, Image, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
@@ -15,6 +17,7 @@ export default function Profile() {
     const currentTheme = useThemeStore((state) => state.currentTheme);
     const [user, setUser] = useState<any>(null);
     const [loading, setLoading] = useState(true);
+    const { isPro, hasReviewed, setReviewed } = useSubscriptionStore();
 
     useEffect(() => {
         getProfile();
@@ -30,8 +33,6 @@ export default function Profile() {
             setLoading(false);
         }
     }
-
-
 
     const handleSignOut = async () => {
         try {
@@ -50,12 +51,34 @@ export default function Profile() {
         }
     };
 
+    const handleRateUs = async () => {
+        if (await StoreReview.hasAction()) {
+            try {
+                await StoreReview.requestReview();
+            } catch (error) {
+                console.log("Review Error:", error);
+            }
+        }
+
+        setReviewed();
+        if (!isPro && !hasReviewed) {
+            Alert.alert("Reward Unlocked!", "You created +1 Memory slot.");
+        }
+    };
+
     const menuItems = [
         {
             label: 'Subscription',
-            value: 'Free Plan',
-            icon: 'zap', // Feather icon name
+            value: isPro ? 'Premium Active' : 'Free Plan',
+            icon: 'zap',
             action: () => router.push('/subscription')
+        },
+        {
+            label: 'Rate Us',
+            value: !hasReviewed && !isPro ? 'Unlock +1 Memory' : undefined,
+            icon: 'star',
+            action: handleRateUs,
+            color: !hasReviewed && !isPro ? '#facc15' : undefined // Gold color for icon check
         },
         {
             label: 'Privacy Policy',
@@ -67,7 +90,6 @@ export default function Profile() {
             icon: 'file-text',
             action: () => router.push('/terms-conditions')
         },
-
     ];
 
     return (
@@ -129,23 +151,31 @@ export default function Profile() {
                         >
                             <TouchableOpacity
                                 onPress={item.action}
-                                style={{ backgroundColor: 'rgba(255,255,255,0.03)' }}
-                                className="flex-row items-center p-4 rounded-2xl border border-white/5 active:bg-white/5"
+                                style={{
+                                    backgroundColor: 'rgba(255,255,255,0.03)',
+                                    borderColor: item.color ? item.color : 'rgba(255,255,255,0.05)',
+                                    borderWidth: item.color ? 1 : 1
+                                }}
+                                className="flex-row items-center p-4 rounded-2xl active:bg-white/5"
                             >
                                 <View className="w-10 h-10 rounded-full bg-white/5 items-center justify-center mr-4">
-                                    <Feather name={item.icon as any} size={20} color={currentTheme.colors.text.primary} />
+                                    <Feather name={item.icon as any} size={20} color={item.color || currentTheme.colors.text.primary} />
                                 </View>
                                 <View className="flex-1">
                                     <Text style={{ color: currentTheme.colors.text.primary, fontFamily: 'Outfit-Medium' }} className="text-base">
                                         {item.label}
                                     </Text>
                                     {item.value && (
-                                        <Text style={{ color: currentTheme.colors.primary, fontFamily: 'Outfit-Bold' }} className="text-[10px] mt-0.5 uppercase tracking-wider">
+                                        <Text style={{ color: item.color || currentTheme.colors.primary, fontFamily: 'Outfit-Bold' }} className="text-xs mt-0.5 uppercase tracking-wider">
                                             {item.value}
                                         </Text>
                                     )}
                                 </View>
-                                <Feather name="chevron-right" size={20} color={currentTheme.colors.text.secondary} />
+                                {item.color ? (
+                                    <View style={{ backgroundColor: item.color }} className="w-2 h-2 rounded-full shadow-[0_0_10px_rgba(250,204,21,0.5)]" />
+                                ) : (
+                                    <Feather name="chevron-right" size={20} color={currentTheme.colors.text.secondary} />
+                                )}
                             </TouchableOpacity>
                         </Animated.View>
                     ))}
