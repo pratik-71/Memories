@@ -1,3 +1,4 @@
+import { CachedImage } from '@/components/CachedImage';
 import { FullScreenLoader } from '@/components/FullScreenLoader';
 import { ImageModal } from '@/components/ImageModal';
 import { StatusModal } from '@/components/StatusModal';
@@ -9,7 +10,7 @@ import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
-import { Alert, Image, ScrollView, Share, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, ScrollView, Share, Text, TouchableOpacity, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 
 const calculateDetailedDuration = (event: any) => {
@@ -370,10 +371,10 @@ export default function EventDetails() {
                                         showsHorizontalScrollIndicator={false}
                                         contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', gap: 10, paddingHorizontal: 24 }}
                                     >
-                                        {event.images.map((uri, index) => (
-                                            <TouchableOpacity key={index} onPress={() => setPreviewImage(uri)} activeOpacity={0.9}>
-                                                <Image
-                                                    source={{ uri }}
+                                        {event.images.map((imgData, index) => (
+                                            <TouchableOpacity key={index} onPress={() => setPreviewImage(imgData.remote)} activeOpacity={0.9}>
+                                                <CachedImage
+                                                    source={imgData}
                                                     style={{ width: 100, height: 100, borderRadius: 16, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' }}
                                                     resizeMode="cover"
                                                 />

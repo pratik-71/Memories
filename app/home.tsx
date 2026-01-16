@@ -3,7 +3,6 @@ import { TimeCapsuleModal } from '@/components/TimeCapsuleModal';
 import { useMemoryLimit } from '@/hooks/useMemoryLimit';
 import { SpecialEvent, useEventStore } from '@/store/eventStore';
 import { useSubscriptionStore } from '@/store/subscriptionStore';
-import { useThemeStore } from '@/store/themeStore';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -56,8 +55,10 @@ const calculateDetailedDuration = (event: SpecialEvent) => {
 
 const LiveEventCard = React.memo(({ item, index, onLockedPress }: { item: SpecialEvent, index: number, onLockedPress: (e: SpecialEvent) => void }) => {
     const router = useRouter();
+    const { hasLocalImage, localUri } = require('@/hooks/useLocalEventImage').useLocalEventImage(item.images);
 
     const [duration, setDuration] = useState(calculateDetailedDuration(item));
+
 
     useEffect(() => {
         // Only run timer if active
@@ -100,7 +101,65 @@ const LiveEventCard = React.memo(({ item, index, onLockedPress }: { item: Specia
                     router.push({ pathname: "/event/[id]", params: { id: item.id } });
                 }}
             >
-                {isLocked ? (
+                {hasLocalImage && localUri && !isLocked ? (
+                    // Beautiful Image Card with Countdown Overlay
+                    <View
+                        style={{ backgroundColor: '#18181b', borderColor: 'rgba(255,255,255,0.08)' }}
+                        className="rounded-3xl border overflow-hidden"
+                    >
+                        <Image
+                            source={{ uri: localUri }}
+                            className="w-full h-56"
+                            resizeMode="cover"
+                        />
+
+                        <View
+                            style={{
+                                position: 'absolute',
+                                top: 0,
+                                left: 0,
+                                right: 0,
+                                bottom: 0,
+                                backgroundColor: 'rgba(0,0,0,0.4)'
+                            }}
+                        />
+
+                        <View className="absolute inset-0 p-6 justify-between">
+                            <View className="flex-row justify-between items-start">
+                                <View className="flex-1 mr-4">
+                                    <Text style={{ fontFamily: 'Outfit-Bold', color: 'white' }} className="text-2xl mb-1" numberOfLines={1}>
+                                        {item.title}
+                                    </Text>
+                                    <Text style={{ fontFamily: 'Outfit-Medium', color: 'rgba(255,255,255,0.9)' }} className="text-xs uppercase tracking-widest">
+                                        {new Date(item.date).toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' })}
+                                    </Text>
+                                </View>
+                                <View className={`flex-row items-center px-3 py-1.5 rounded-full ${item.status === 'completed' ? 'bg-green-500/30' : (item.status === 'paused' ? 'bg-yellow-500/30' : 'bg-white/20')}`}>
+                                    <Text style={{ fontFamily: 'Outfit-Bold', color: 'white' }} className="text-[10px] uppercase tracking-wider">
+                                        {item.status === 'completed' ? 'DONE' : (item.status === 'paused' ? 'PAUSED' : (duration.isPast ? 'SINCE' : 'UNTIL'))}
+                                    </Text>
+                                </View>
+                            </View>
+
+                            <View className="bg-black/50 backdrop-blur-sm rounded-2xl p-4">
+                                <View className="flex-row gap-2 mb-2">
+                                    <TimeUnit value={duration.years} label="Yrs" />
+                                    <View style={{ width: 1, backgroundColor: 'rgba(255,255,255,0.3)', height: '80%', marginTop: 5 }} />
+                                    <TimeUnit value={duration.months} label="Mths" />
+                                    <View style={{ width: 1, backgroundColor: 'rgba(255,255,255,0.3)', height: '80%', marginTop: 5 }} />
+                                    <TimeUnit value={duration.days} label="Days" />
+                                </View>
+                                <View className="flex-row gap-2 pt-2 border-t border-white/20">
+                                    <TimeUnit value={duration.hours} label="Hrs" />
+                                    <View style={{ width: 1, backgroundColor: 'rgba(255,255,255,0.3)', height: '80%', marginTop: 5 }} />
+                                    <TimeUnit value={duration.minutes} label="Mins" />
+                                    <View style={{ width: 1, backgroundColor: 'rgba(255,255,255,0.3)', height: '80%', marginTop: 5 }} />
+                                    <TimeUnit value={duration.seconds} label="Secs" />
+                                </View>
+                            </View>
+                        </View>
+                    </View>
+                ) : isLocked ? (
                     // Locked Time Capsule UI
                     <View
                         style={{ backgroundColor: '#111113', borderColor: 'rgba(129, 140, 248, 0.2)' }}

@@ -1,3 +1,4 @@
+import { CachedImage } from '@/components/CachedImage';
 import { AestheticDatePicker, AestheticTimePicker } from '@/components/DateTimePicker';
 import { FullScreenLoader } from '@/components/FullScreenLoader';
 import { ImageModal } from '@/components/ImageModal';
@@ -10,7 +11,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useState } from 'react';
-import { Alert, Image, LayoutAnimation, Platform, ScrollView, Switch, Text, TextInput, TouchableOpacity, UIManager, View } from 'react-native';
+import { Alert, LayoutAnimation, Platform, ScrollView, Switch, Text, TextInput, TouchableOpacity, UIManager, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 
 if (Platform.OS === 'android') {
@@ -250,7 +251,7 @@ export default function CreateEvent() {
                             {selectedImages.map((uri, index) => (
                                 <View key={index} className="relative w-20 h-20 rounded-xl overflow-hidden border border-white/10">
                                     <TouchableOpacity onPress={() => setPreviewImage(uri)} activeOpacity={0.8}>
-                                        <Image source={{ uri }} className="w-full h-full" resizeMode="cover" />
+                                        <CachedImage source={uri} className="w-full h-full" resizeMode="cover" />
                                     </TouchableOpacity>
                                     <TouchableOpacity
                                         onPress={() => removeImage(index)}

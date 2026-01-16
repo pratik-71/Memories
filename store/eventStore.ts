@@ -6,12 +6,18 @@ import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 import { useSubscriptionStore } from './subscriptionStore';
 
+// Image with hybrid local + remote paths for cost optimization
+export interface EventImage {
+  local: string;  // Local file path (fast, free)
+  remote: string; // Supabase URL (backup, cross-device sync)
+}
+
 export interface SpecialEvent {
   id: string;
   title: string;
   description?: string;
   date: string; // ISO string
-  images?: string[]; // Array of image URIs
+  images?: EventImage[]; // Hybrid local + remote image paths
   createdAt: string;
   updatedAt: string;
   user_id?: string;
@@ -22,15 +28,20 @@ export interface SpecialEvent {
   isTimeCapsule?: boolean; // New Flag for Time Capsule
 }
 
+// Input type for creating/updating events (accepts both formats)
+export interface EventInput extends Omit<SpecialEvent, 'images'> {
+  images?: (string | EventImage)[]; // Accept both string URLs and hybrid objects
+}
+
 interface EventState {
   events: SpecialEvent[];
   isLoading: boolean;
   error: string | null;
   fetchEvents: () => Promise<void>;
   fetchEventDetails: (id: string) => Promise<void>;
-  addEvent: (event: Omit<SpecialEvent, 'id' | 'createdAt' | 'updatedAt'>) => Promise<string | null>;
+  addEvent: (event: Omit<EventInput, 'id' | 'createdAt' | 'updatedAt'>) => Promise<string | null>;
   deleteEvent: (id: string) => Promise<void>;
-  updateEvent: (id: string, updates: Partial<SpecialEvent>) => Promise<void>;
+  updateEvent: (id: string, updates: Partial<EventInput>) => Promise<void>;
   togglePauseEvent: (id: string) => Promise<void>;
   completeEvent: (id: string) => Promise<void>;
   getEventById: (id: string) => Promise<SpecialEvent | null>;
@@ -128,22 +139,32 @@ export const useEventStore = create<EventState>()(
             const { data: { user } = {} } = await supabase.auth.getUser();
             if (!user) throw new Error("User not authenticated");
 
-            // 2. Upload Images to Supabase Storage
-            let imageUrls: string[] = [];
+            // 2. Upload Images to Supabase Storage (Hybrid: keep local + remote)
+            let hybridImages: EventImage[] = [];
             if (event.images && event.images.length > 0) {
-                const uploadPromises = event.images.map(async (uri) => {
+                const uploadPromises = event.images.map(async (imgInput) => {
                     try {
-                        if (!uri.startsWith('file://')) return uri; // Already remote
+                        // Handle both string (legacy) and EventImage input
+                        const localUri = typeof imgInput === 'string' ? imgInput : imgInput.local;
+                        
+                        // If already an EventImage with remote, keep it
+                        if (typeof imgInput !== 'string' && imgInput.remote) {
+                            return imgInput;
+                        }
+                        
+                        // If it's a remote URL (not local file), convert to EventImage
+                        if (!localUri.startsWith('file://')) {
+                            return { local: localUri, remote: localUri } as EventImage;
+                        }
 
                         // Compress before upload
-                        const compressed = await compressImage(uri);
-                        const uploadUri = compressed.uri; // Use compressed URI
+                        const compressed = await compressImage(localUri);
+                        const uploadUri = compressed.uri;
 
                         const response = await fetch(uploadUri);
                         const arrayBuffer = await response.arrayBuffer();
-                        const fileExt = 'jpeg'; // Changed to jpeg to match bucket strict mime types
+                        const fileExt = 'jpeg';
                         
-                        // Construct file path
                         const fileName = `${user.id}/${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
                         
                         const { error: uploadError } = await supabase.storage
@@ -159,7 +180,8 @@ export const useEventStore = create<EventState>()(
                             .from('Event Image')
                             .getPublicUrl(fileName);
 
-                        return publicUrl;
+                        // Return hybrid object with both paths
+                        return { local: localUri, remote: publicUrl } as EventImage;
                     } catch (uploadErr) {
                         console.error('Image upload failed:', uploadErr);
                         return null; 
@@ -167,7 +189,7 @@ export const useEventStore = create<EventState>()(
                 });
 
                 const results = await Promise.all(uploadPromises);
-                imageUrls = results.filter((url): url is string => url !== null);
+                hybridImages = results.filter((img): img is EventImage => img !== null);
             }
 
             const newEvent = {
@@ -175,7 +197,7 @@ export const useEventStore = create<EventState>()(
                 title: event.title,
                 description: event.description,
                 date: event.date,
-                images: imageUrls, // Use the uploaded URLs
+                images: hybridImages.map(img => img.remote), // Store only remote URLs in DB
                 is_time_capsule: event.isTimeCapsule || false,
             };
 
@@ -200,10 +222,10 @@ export const useEventStore = create<EventState>()(
                     
                      if (fallbackError) throw fallbackError;
 
-                     // Use fallback data but attach our local (remote) image URLs for the store
+                     // Use fallback data but attach our hybrid images for the store
                      const mappedFallback = {
                         ...fallbackData,
-                        images: imageUrls,
+                        images: hybridImages,
                         createdAt: fallbackData.created_at,
                         updatedAt: fallbackData.updated_at
                      };
@@ -218,7 +240,7 @@ export const useEventStore = create<EventState>()(
 
             const mappedEvent = {
                 ...data,
-                images: data.images || imageUrls, // Use DB returned or our uploaded ones
+                images: hybridImages, // Use hybrid local + remote images
                 createdAt: data.created_at,
                 updatedAt: data.updated_at,
                 isTimeCapsule: data.is_time_capsule
@@ -246,10 +268,10 @@ export const useEventStore = create<EventState>()(
              const eventToDelete = get().events.find(e => e.id === id);
              
              if (eventToDelete && eventToDelete.images && eventToDelete.images.length > 0) {
-                 const imagePaths = eventToDelete.images.map(url => {
-                     // Extract path from public URL. 
-                     // We need the part after /event-images/
-                     const parts = url.split('/event-images/');
+                 const imagePaths = eventToDelete.images.map(img => {
+                     // Extract path from public URL (use remote URL from hybrid image)
+                     const remoteUrl = img.remote;
+                     const parts = remoteUrl.split('/event-images/');
                      // Decode URI component just in case
                      return parts.length > 1 ? decodeURIComponent(parts[1]) : null;
                  }).filter((path): path is string => path !== null);
@@ -367,16 +389,27 @@ export const useEventStore = create<EventState>()(
           try {
               const { data: { user } } = await supabase.auth.getUser();
 
-              // Handle Image Uploads
-              let validImages = updates.images;
+              // Handle Image Uploads (Hybrid: keep local + remote)
+              let hybridImages = updates.images;
               
-              if (updates.images && updates.images.length > 0 && user) {
-                  const uploadPromises = updates.images.map(async (uri) => {
-                     if (!uri.startsWith('file://')) return uri; // Already remote/existing
-
+              if (updates.images &&updates.images.length > 0 && user) {
+                  const uploadPromises = updates.images.map(async (imgInput) => {
                      try {
+                        // Handle both string (legacy) and EventImage input
+                        const localUri = typeof imgInput === 'string' ? imgInput : imgInput.local;
+                        
+                        // If already an EventImage with remote, keep it
+                        if (typeof imgInput !== 'string' && imgInput.remote) {
+                            return imgInput;
+                        }
+                        
+                        // If it's a remote URL (not local file), convert to EventImage
+                        if (!localUri.startsWith('file://')) {
+                            return { local: localUri, remote: localUri } as EventImage;
+                        }
+
                         // Compress before upload
-                        const compressed = await compressImage(uri);
+                        const compressed = await compressImage(localUri);
                         const uploadUri = compressed.uri;
 
                      const response = await fetch(uploadUri);
@@ -394,19 +427,23 @@ export const useEventStore = create<EventState>()(
                         const { data: { publicUrl } } = supabase.storage
                             .from('Event Image')
                             .getPublicUrl(filePath);
-                        return publicUrl;
+                        
+                        // Return hybrid object
+                        return { local: localUri, remote: publicUrl } as EventImage;
                      } catch (e) {
                          console.error("Upload failed in update:", e);
                          return null;
                      }
                   });
                   const results = await Promise.all(uploadPromises);
-                  validImages = results.filter((url): url is string => url !== null);
+                  hybridImages = results.filter((img): img is EventImage => img !== null);
               }
 
               const finalUpdates: any = {
                   ...updates,
-                  images: validImages 
+                  images: hybridImages?.map(img => 
+                    typeof img === 'string' ? img : img.remote
+                  ) // Store only remote URLs in DB
               };
 
               // Map camelCase to snake_case for DB
@@ -415,10 +452,14 @@ export const useEventStore = create<EventState>()(
                   delete finalUpdates.isTimeCapsule;
               }
 
-              // Optimistic update
+              // Optimistic update - ensure proper typing
               set((state) => {
                   return {
-                    events: state.events.map((e) => e.id === id ? { ...e, ...updates, images: validImages } : e)
+                    events: state.events.map((e) => 
+                      e.id === id 
+                        ? { ...e, images: hybridImages, ...updates } as SpecialEvent
+                        : e
+                    )
                   };
               });
 

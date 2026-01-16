@@ -1,3 +1,4 @@
+import { CachedImage } from '@/components/CachedImage';
 import { AestheticDatePicker, AestheticTimePicker } from '@/components/DateTimePicker';
 import { FullScreenLoader } from '@/components/FullScreenLoader';
 import { ImageModal } from '@/components/ImageModal';
@@ -10,7 +11,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
-import { Alert, Image, LayoutAnimation, Platform, ScrollView, Text, TextInput, TouchableOpacity, UIManager, View } from 'react-native';
+import { Alert, LayoutAnimation, Platform, ScrollView, Text, TextInput, TouchableOpacity, UIManager, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 
 if (Platform.OS === 'android') {
@@ -47,7 +48,11 @@ export default function EditEvent() {
             setTitle(eventToEdit.title);
             setDescription(eventToEdit.description || '');
             setDate(new Date(eventToEdit.date));
-            setSelectedImages(eventToEdit.images || []);
+            // Extract string URIs from EventImage objects for preview
+            const imageUris = eventToEdit.images?.map(img =>
+                typeof img === 'string' ? img : (img.local || img.remote)
+            ) || [];
+            setSelectedImages(imageUris);
         }
     }, [eventToEdit]);
 
@@ -223,7 +228,7 @@ export default function EditEvent() {
                             {selectedImages.map((uri, index) => (
                                 <View key={index} className="relative w-20 h-20 rounded-xl overflow-hidden border border-white/10">
                                     <TouchableOpacity onPress={() => setPreviewImage(uri)} activeOpacity={0.8}>
-                                        <Image source={{ uri }} className="w-full h-full" resizeMode="cover" />
+                                        <CachedImage source={uri} className="w-full h-full" resizeMode="cover" />
                                     </TouchableOpacity>
                                     <TouchableOpacity
                                         onPress={() => removeImage(index)}
