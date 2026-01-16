@@ -1,6 +1,5 @@
 import { EventImage } from '@/store/eventStore';
-import * as FileSystem from 'expo-file-system';
-import { useEffect, useState } from 'react';
+import { useMemo } from 'react';
 
 interface LocalImageCheckResult {
   hasLocalImage: boolean;
@@ -8,47 +7,30 @@ interface LocalImageCheckResult {
 }
 
 /**
- * Hook to check if event's first image exists locally
- * WITHOUT downloading from Supabase
+ * Hook to get first image URI for display
+ * SYNCHRONOUS - No async checks, shows images immediately
  */
 export const useLocalEventImage = (images?: EventImage[]): LocalImageCheckResult => {
-  const [result, setResult] = useState<LocalImageCheckResult>({
-    hasLocalImage: false,
-    localUri: null,
-  });
+  return useMemo(() => {
+    if (!images || images.length === 0) {
+      return { hasLocalImage: false, localUri: null };
+    }
 
-  useEffect(() => {
-    const checkLocalImage = async () => {
-      try {
-        const firstImage = images?.[0];
-        if (!firstImage) {
-          setResult({ hasLocalImage: false, localUri: null });
-          return;
-        }
+    const firstImage = images[0];
+    
+    // Extract URI (prioritize local, fallback to remote)
+    let uri: string | null = null;
+    
+    if (typeof firstImage === 'string') {
+      uri = firstImage;
+    } else {
+      // Try local first (instant), fallback to remote (cloud)
+      uri = firstImage.local || firstImage.remote;
+    }
 
-        // Extract local path from EventImage or use string directly
-        const localPath = typeof firstImage === 'string' ? firstImage : firstImage.local;
-
-        // Only check if it's a local file path (don't download remote)
-        if (localPath && localPath.startsWith('file://')) {
-          const fileInfo = await FileSystem.getInfoAsync(localPath);
-
-          if (fileInfo.exists) {
-            setResult({ hasLocalImage: true, localUri: localPath });
-          } else {
-            setResult({ hasLocalImage: false, localUri: null });
-          }
-        } else {
-          setResult({ hasLocalImage: false, localUri: null });
-        }
-      } catch (error) {
-        console.log('[useLocalEventImage] Check failed:', error);
-        setResult({ hasLocalImage: false, localUri: null });
-      }
+    return {
+      hasLocalImage: !!uri,
+      localUri: uri
     };
-
-    checkLocalImage();
-  }, [images]);
-
-  return result;
+  }, [images, images?.length]);
 };

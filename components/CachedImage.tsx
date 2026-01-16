@@ -1,5 +1,4 @@
 import { EventImage } from '@/store/eventStore';
-import * as FileSystem from 'expo-file-system';
 import React, { useEffect, useState } from 'react';
 import { Image, ImageProps, ImageSourcePropType } from 'react-native';
 
@@ -39,13 +38,18 @@ export const CachedImage: React.FC<CachedImageProps> = ({ source, ...props }) =>
 
             // **Step 1: Try local file first (fast, free)**
             if (local && local.startsWith('file://')) {
-                const fileInfo = await FileSystem.getInfoAsync(local);
+                try {
+                    const FileSystem = require('expo-file-system');
+                    const fileInfo = await FileSystem.getInfoAsync(local);
 
-                if (fileInfo.exists) {
-                    // ✅ Local file found - use it!
-                    setImageSource({ uri: local });
-                    setIsLoading(false);
-                    return;
+                    if (fileInfo.exists) {
+                        // ✅ Local file found - use it!
+                        setImageSource({ uri: local });
+                        setIsLoading(false);
+                        return;
+                    }
+                } catch (fsError) {
+                    console.log('[CachedImage] FileSystem check failed, will use remote');
                 }
             }
 

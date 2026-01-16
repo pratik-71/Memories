@@ -53,6 +53,65 @@ const calculateDetailedDuration = (event: SpecialEvent) => {
     return { years, months, days, hours, minutes, seconds, isPast };
 };
 
+// Auto-Scrolling Image Carousel Component
+const ImageCarousel = React.memo(({ images }: { images?: any[] }) => {
+    const [currentIndex, setCurrentIndex] = useState(0);
+    const scrollViewRef = React.useRef<ScrollView>(null);
+    const { width } = Dimensions.get('window');
+
+    // Extract image URIs (handle both EventImage objects and strings)
+    const imageUris = React.useMemo(() => {
+        if (!images || images.length === 0) return [];
+        return images.map(img => {
+            if (typeof img === 'string') return img;
+            // Try local first, fallback to remote
+            return img.local || img.remote;
+        }).filter(Boolean);
+    }, [images]);
+
+    // Auto-scroll effect
+    useEffect(() => {
+        if (imageUris.length <= 1) return;
+
+        const interval = setInterval(() => {
+            setCurrentIndex(prev => {
+                const next = (prev + 1) % imageUris.length;
+                scrollViewRef.current?.scrollTo({ x: next * width, animated: true });
+                return next;
+            });
+        }, 3000); // Change image every 3 seconds
+
+        return () => clearInterval(interval);
+    }, [imageUris.length, width]);
+
+    if (imageUris.length === 0) return null;
+
+    return (
+        <View style={{ position: 'relative' }}>
+            <ScrollView
+                ref={scrollViewRef}
+                horizontal
+                pagingEnabled
+                showsHorizontalScrollIndicator={false}
+                scrollEventThrottle={16}
+                onMomentumScrollEnd={(event) => {
+                    const index = Math.round(event.nativeEvent.contentOffset.x / width);
+                    setCurrentIndex(index);
+                }}
+            >
+                {imageUris.map((uri, index) => (
+                    <Image
+                        key={index}
+                        source={{ uri }}
+                        style={{ width, height: 224 }} // h-56 = 224px
+                        resizeMode="cover"
+                    />
+                ))}
+            </ScrollView>
+        </View>
+    );
+});
+
 const LiveEventCard = React.memo(({ item, index, onLockedPress }: { item: SpecialEvent, index: number, onLockedPress: (e: SpecialEvent) => void }) => {
     const router = useRouter();
     const { hasLocalImage, localUri } = require('@/hooks/useLocalEventImage').useLocalEventImage(item.images);
@@ -102,16 +161,13 @@ const LiveEventCard = React.memo(({ item, index, onLockedPress }: { item: Specia
                 }}
             >
                 {hasLocalImage && localUri && !isLocked ? (
-                    // Beautiful Image Card with Countdown Overlay
+                    // Beautiful Image Card with Auto-Scrolling Images
                     <View
                         style={{ backgroundColor: '#18181b', borderColor: 'rgba(255,255,255,0.08)' }}
                         className="rounded-3xl border overflow-hidden"
                     >
-                        <Image
-                            source={{ uri: localUri }}
-                            className="w-full h-56"
-                            resizeMode="cover"
-                        />
+                        {/* Auto-Scrolling Image Carousel */}
+                        <ImageCarousel images={item.images} />
 
                         <View
                             style={{
@@ -235,6 +291,14 @@ const LiveEventCard = React.memo(({ item, index, onLockedPress }: { item: Specia
                 )}
             </TouchableOpacity>
         </Animated.View>
+    );
+}, (prevProps, nextProps) => {
+    // Custom comparison: re-render if images change
+    return (
+        prevProps.item.id === nextProps.item.id &&
+        prevProps.item.status === nextProps.item.status &&
+        prevProps.item.date === nextProps.item.date &&
+        JSON.stringify(prevProps.item.images) === JSON.stringify(nextProps.item.images)
     );
 });
 

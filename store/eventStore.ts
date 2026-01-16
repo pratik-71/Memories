@@ -59,22 +59,20 @@ export const useEventStore = create<EventState>()(
         try {
           const { data, error } = await supabase
             .from('events')
-            .select('id, title, date, created_at, updated_at, user_id, status, paused_at, completed_at, total_paused_duration, is_time_capsule')
+            .select('id, title, date, created_at, updated_at, user_id, status, paused_at, completed_at, total_paused_duration, is_time_capsule, images, description')
             .order('date', { ascending: true });
 
           if (error) throw error;
           
-
 
           // Map DB snake_case to camelCase
           const mappedEvents = data.map((e: any) => ({
              ...e,
              createdAt: e.created_at,
              updatedAt: e.updated_at,
-             images: [], // List view doesn't fetch images
-             description: '', // List view doesn't fetch description
-             // Merge local widget style if exists
-             // Merge local widget style if exists
+             // Convert string[] from DB to EventImage[] format
+             images: e.images?.map((url: string) => ({ local: url, remote: url })) || [],
+             description: e.description || '',
              isTimeCapsule: e.is_time_capsule
           }));
 
