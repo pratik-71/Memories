@@ -60,18 +60,42 @@ export default function Subscription() {
                         />
                     </Animated.View>
 
-                    {/* Text Content */}
-                    <Animated.View entering={FadeInDown.delay(300).springify()} className="items-center w-full mb-8">
-                        <Text style={{ fontFamily: 'Outfit-Bold', color: 'white' }} className="text-3xl text-center mb-2">
-                            Unlock Unlimited
-                        </Text>
-                        <Text style={{ fontFamily: 'Outfit-Regular', color: 'rgba(255,255,255,0.5)' }} className="text-center text-base leading-6 px-4">
-                            Create unlimited memories.{'\n'}Keep your moments forever.
-                        </Text>
-                    </Animated.View>
+                    {/* Text Content - Only show if not Pro */}
+                    {!isPro && (
+                        <Animated.View entering={FadeInDown.delay(300).springify()} className="items-center w-full mb-8">
+                            <Text style={{ fontFamily: 'Outfit-Bold', color: 'white' }} className="text-3xl text-center mb-2">
+                                Unlock Unlimited
+                            </Text>
+                            <Text style={{ fontFamily: 'Outfit-Regular', color: 'rgba(255,255,255,0.5)' }} className="text-center text-base leading-6 px-4">
+                                Create unlimited memories.{'\n'}Keep your moments forever.
+                            </Text>
+                        </Animated.View>
+                    )}
 
-                    {/* Loading State */}
-                    {isLoading || !offerings ? (
+                    {/* Loading/Pro State Check */}
+                    {isPro ? (
+                        <Animated.View entering={FadeInDown.delay(300).springify()} className="w-full items-center py-8 px-4">
+                            <View className="w-20 h-20 bg-green-500/20 rounded-full items-center justify-center mb-6">
+                                <Feather name="check" size={40} color="#4ade80" />
+                            </View>
+                            <Text style={{ fontFamily: 'Outfit-Bold', color: 'white' }} className="text-2xl mb-2 text-center">
+                                Premium Active
+                            </Text>
+                            <Text style={{ fontFamily: 'Outfit-Regular', color: 'rgba(255,255,255,0.6)' }} className="text-center text-base mb-8">
+                                You have unlimited access to all features. Thank you for your support!
+                            </Text>
+
+                            <TouchableOpacity
+                                onPress={() => router.back()}
+                                style={{ backgroundColor: currentTheme.colors.primary }}
+                                className="w-full py-4 rounded-3xl items-center"
+                            >
+                                <Text style={{ fontFamily: 'Outfit-Bold', color: '#000' }} className="text-base">
+                                    Start Creating
+                                </Text>
+                            </TouchableOpacity>
+                        </Animated.View>
+                    ) : (isLoading || !offerings ? (
                         <View className="items-center py-10">
                             <Text style={{ fontFamily: 'Outfit-Regular', color: 'rgba(255,255,255,0.5)' }}>Loading offers...</Text>
                         </View>
@@ -152,21 +176,35 @@ export default function Subscription() {
                                 )
                             })}
 
-                            {/* Restore Purchases */}
+                            {/* Restore & Legal */}
                             <Animated.View entering={FadeInDown.delay(600).springify()} className="items-center mt-4 mb-6">
                                 <TouchableOpacity
                                     onPress={restorePurchases}
-                                    className="py-2 px-4"
+                                    className="py-2 px-4 mb-4"
                                 >
                                     <Text style={{ fontFamily: 'Outfit-Medium', color: 'rgba(255,255,255,0.4)' }} className="text-xs">
                                         Restore Purchases
                                     </Text>
                                 </TouchableOpacity>
+
+                                <View className="flex-row gap-4">
+                                    <TouchableOpacity onPress={() => router.push('/terms-conditions')}>
+                                        <Text style={{ fontFamily: 'Outfit-Regular', color: 'rgba(255,255,255,0.3)' }} className="text-[10px]">
+                                            Terms of Service
+                                        </Text>
+                                    </TouchableOpacity>
+                                    <Text style={{ fontFamily: 'Outfit-Regular', color: 'rgba(255,255,255,0.3)' }} className="text-[10px]">•</Text>
+                                    <TouchableOpacity onPress={() => router.push('/privacy-policy')}>
+                                        <Text style={{ fontFamily: 'Outfit-Regular', color: 'rgba(255,255,255,0.3)' }} className="text-[10px]">
+                                            Privacy Policy
+                                        </Text>
+                                    </TouchableOpacity>
+                                </View>
                             </Animated.View>
                         </View>
-                    )}
+                    ))}
                 </View>
-            </ScrollView>
-        </View>
+            </ScrollView >
+        </View >
     );
 }
