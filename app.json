@@ -2,7 +2,7 @@
   "expo": {
     "name": "Memories",
     "slug": "memories",
-    "version": "1.0.5",
+    "version": "1.0.9",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "memories",
@@ -33,7 +33,7 @@
         "android.permission.SCHEDULE_EXACT_ALARM",
         "android.permission.POST_NOTIFICATIONS"
       ],
-      "versionCode": 5
+      "versionCode": 9
     },
     "web": {
       "output": "static",
@@ -61,6 +61,7 @@
           "color": "#000000"
         }
       ],
+      "expo-navigation-bar",
       [
         "expo-image-picker",
         {

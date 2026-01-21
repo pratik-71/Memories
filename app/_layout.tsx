@@ -67,6 +67,16 @@ export default function RootLayout() {
 
 
   useEffect(() => {
+    if (Platform.OS === 'android') {
+      try {
+        NavigationBar.setBackgroundColorAsync("#000000");
+        NavigationBar.setButtonStyleAsync("light");
+        NavigationBar.setVisibilityAsync("hidden");
+        NavigationBar.setBehaviorAsync("overlay-swipe");
+      } catch (e) {
+        console.log("NavigationBar module not found or failed (this is expected if native code hasn't finished rebuilding):", e);
+      }
+    }
     SystemUI.setBackgroundColorAsync("black");
     // RevenueCatService.init();
     useSubscriptionStore.getState().initialize();

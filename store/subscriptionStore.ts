@@ -9,6 +9,8 @@ interface SubscriptionState {
   isRestoring: boolean;
   hasReviewed: boolean;
   
+  activeProductId: string | null;
+  
   initialize: () => Promise<void>;
   updateCustomerInfo: (customerInfo: CustomerInfo) => void;
   purchasePackage: (pack: PurchasesPackage) => Promise<boolean>;
@@ -18,6 +20,7 @@ interface SubscriptionState {
 
 export const useSubscriptionStore = create<SubscriptionState>((set, get) => ({
   isPro: false,
+  activeProductId: null,
   offerings: null,
   isLoading: false,
   isRestoring: false,
@@ -45,10 +48,12 @@ export const useSubscriptionStore = create<SubscriptionState>((set, get) => ({
   },
 
   updateCustomerInfo: (customerInfo: CustomerInfo) => {
-    // Check for "pro" entitlement. This must match your RevenueCat configuration.
-    // If your entitlement ID is different (e.g. "premium"), change it here.
+    // Check for "pro" entitlement.
     const entitlement = customerInfo.entitlements.active['pro']; 
-    set({ isPro: !!entitlement });
+    set({ 
+        isPro: !!entitlement,
+        activeProductId: entitlement?.productIdentifier ?? null
+    });
   },
 
   purchasePackage: async (pack: PurchasesPackage) => {

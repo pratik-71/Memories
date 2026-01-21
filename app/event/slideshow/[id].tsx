@@ -115,15 +115,21 @@ export default function Slideshow() {
 
     const currentImage = event.images?.[currentIndex];
 
+    const imageUri = currentImage
+        ? (typeof currentImage === 'string'
+            ? currentImage
+            : (currentImage.local || currentImage.remote))
+        : null;
+
     return (
         <View style={styles.container}>
             <StatusBar hidden />
 
             {/* Main Image Layer */}
-            {currentImage && (
+            {imageUri && (
                 <Animated.View style={[styles.imageContainer, animatedStyle]}>
                     <Image
-                        source={{ uri: currentImage }}
+                        source={{ uri: imageUri }}
                         style={styles.image}
                         resizeMode="cover"
                     />

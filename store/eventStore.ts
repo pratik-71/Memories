@@ -266,21 +266,72 @@ export const useEventStore = create<EventState>()(
              const eventToDelete = get().events.find(e => e.id === id);
              
              if (eventToDelete && eventToDelete.images && eventToDelete.images.length > 0) {
-                 const imagePaths = eventToDelete.images.map(img => {
-                     // Extract path from public URL (use remote URL from hybrid image)
-                     const remoteUrl = img.remote;
-                     const parts = remoteUrl.split('/event-images/');
-                     // Decode URI component just in case
-                     return parts.length > 1 ? decodeURIComponent(parts[1]) : null;
-                 }).filter((path): path is string => path !== null);
+                 console.log(`[deleteEvent] Found ${eventToDelete.images.length} images to delete for event ${id}`);
+                 
+                 // Group images by bucket to handle potential legacy/different buckets
+                 const bucketMap: Record<string, string[]> = {};
 
-                 if (imagePaths.length > 0) {
-                     const { error: storageError } = await supabase.storage
-                        .from('Event Image')
-                        .remove(imagePaths);
+                 eventToDelete.images.forEach(img => {
+                     const remoteUrl = img.remote;
+                     if (!remoteUrl) return;
+
+                     // Clean URL of query params or hashes which might interfere with path matching
+                     const cleanUrl = remoteUrl.split('?')[0].split('#')[0];
+
+                     // Regex to extract bucket and path from probable Supabase public URL structure
+                     // URLs usually contain /public/{bucket}/{path} or .../storage/v1/object/public/{bucket}/{path}
+                     const match = cleanUrl.match(/\/public\/([^/]+)\/(.+)$/);
                      
-                     if (storageError) console.warn("Failed to clean up images:", storageError);
-                 }
+                     if (match && match.length >= 3) {
+                         const bucketName = decodeURIComponent(match[1]);
+                         const path = decodeURIComponent(match[2]);
+                         
+                         if (!bucketMap[bucketName]) bucketMap[bucketName] = [];
+                         bucketMap[bucketName].push(path);
+                     } else {
+                         // Fallback: Check known bucket patterns explicitly if regex fails
+                         let bucket: string | null = null;
+                         let path: string | null = null;
+
+                         if (cleanUrl.includes('/Event%20Image/')) {
+                             bucket = 'Event Image';
+                             path = decodeURIComponent(cleanUrl.split('/Event%20Image/')[1]);
+                         } else if (cleanUrl.includes('/Event Image/')) {
+                             bucket = 'Event Image';
+                             path = decodeURIComponent(cleanUrl.split('/Event Image/')[1]);
+                         } else if (cleanUrl.includes('/event-images/')) {
+                             bucket = 'event-images'; // Legacy
+                             path = decodeURIComponent(cleanUrl.split('/event-images/')[1]);
+                         }
+
+                         if (bucket && path) {
+                             if (!bucketMap[bucket]) bucketMap[bucket] = [];
+                             bucketMap[bucket].push(path);
+                         } else {
+                             console.warn(`[deleteEvent] Could not parse bucket/path from URL: ${remoteUrl}`);
+                         }
+                     }
+                 });
+
+                 // Delete from each bucket found
+                 const deletePromises = Object.entries(bucketMap).map(async ([bucket, paths]) => {
+                     if (paths.length > 0) {
+                         console.log(`[deleteEvent] Deleting ${paths.length} files from bucket: '${bucket}'`);
+                         const { error: storageError } = await supabase.storage
+                            .from(bucket)
+                            .remove(paths);
+                         
+                         if (storageError) {
+                             console.warn(`[deleteEvent] Failed to delete from ${bucket}:`, storageError);
+                         } else {
+                             console.log(`[deleteEvent] Successfully deleted files from ${bucket}`);
+                         }
+                     }
+                 });
+                 
+                 await Promise.all(deletePromises);
+             } else {
+                 console.log(`[deleteEvent] No images found to delete for event ${id}`);
              }
 
               // 2. Cancel Notifications
