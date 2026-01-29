@@ -100,6 +100,33 @@ class RevenueCatService {
           return null;
       }
   }
+  /**
+   * Log in a user with a specific App User ID (Supabase ID)
+   */
+  static async logIn(userId: string): Promise<CustomerInfo | null> {
+      try {
+          const { customerInfo } = await Purchases.logIn(userId);
+          console.log("✅ [RevenueCat] Logged in as:", userId);
+          return customerInfo;
+      } catch (e) {
+          console.error("❌ [RevenueCat] Error logging in:", e);
+          return null;
+      }
+  }
+
+  /**
+   * Log out the current user
+   */
+  static async logOut(): Promise<CustomerInfo | null> {
+      try {
+          const customerInfo = await Purchases.logOut();
+          console.log("👋 [RevenueCat] Logged out");
+          return customerInfo;
+      } catch (e) {
+          console.error("❌ [RevenueCat] Error logging out:", e);
+          return null;
+      }
+  }
 }
 
 export default RevenueCatService;

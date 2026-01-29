@@ -310,6 +310,7 @@ export default function Home() {
     const { isPro, hasReviewed } = useSubscriptionStore();
     const limit = useMemoryLimit();
     const [lockedEvent, setLockedEvent] = useState<SpecialEvent | null>(null);
+    const [reviewModalVisible, setReviewModalVisible] = useState(false);
 
     const [loading, setLoading] = useState(true);
 
@@ -331,6 +332,17 @@ export default function Home() {
             return () => clearTimeout(timer);
         }
     }, [loading, isPro, hasReviewed]);
+
+    // Show Review Modal if user has created at least 1 memory and hasn't reviewed yet
+    // useEffect(() => {
+    //     if (!loading && !hasReviewed && events.length >= 1) {
+    //         // Wait a bit so it doesn't clash with other modals or loading
+    //         const timer = setTimeout(() => {
+    //             setReviewModalVisible(true);
+    //         }, 3000);
+    //         return () => clearTimeout(timer);
+    //     }
+    // }, [loading, hasReviewed, events.length]);
 
     const [searchQuery, setSearchQuery] = useState('');
 
@@ -475,6 +487,7 @@ export default function Home() {
 
             {/* Modals */}
             <TimeCapsuleModal event={lockedEvent} onClose={() => setLockedEvent(null)} />
+            {/* <ReviewModal visible={reviewModalVisible} onClose={() => setReviewModalVisible(false)} /> */}
         </View>
     );
 }

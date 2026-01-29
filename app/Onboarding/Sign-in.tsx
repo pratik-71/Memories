@@ -3,9 +3,10 @@ import {
     GoogleSignin,
     statusCodes,
 } from '@react-native-google-signin/google-signin';
+import * as AppleAuthentication from 'expo-apple-authentication';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { Alert, Dimensions, Image, ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, Dimensions, Image, Platform, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { supabase } from '../../lib/supabase';
 
@@ -51,6 +52,38 @@ export default function SignIn() {
                 Alert.alert("Error", "Play services not available");
             } else {
                 Alert.alert("Google Sign In Error", error.message);
+            }
+        }
+    };
+
+    const signInWithApple = async () => {
+        try {
+            const credential = await AppleAuthentication.signInAsync({
+                requestedScopes: [
+                    AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
+                    AppleAuthentication.AppleAuthenticationScope.EMAIL,
+                ],
+            });
+
+            if (credential.identityToken) {
+                const { error } = await supabase.auth.signInWithIdToken({
+                    provider: 'apple',
+                    token: credential.identityToken,
+                });
+
+                if (error) {
+                    Alert.alert('Supabase Error', error.message);
+                } else {
+                    router.replace('/Onboarding/SetupBirthday');
+                }
+            } else {
+                throw new Error('No identity token provided.');
+            }
+        } catch (e: any) {
+            if (e.code === 'ERR_REQUEST_CANCELED') {
+                // handle that the user canceled the sign-in flow
+            } else {
+                Alert.alert('Error', e.message);
             }
         }
     };
@@ -110,6 +143,22 @@ export default function SignIn() {
                             Continue with Google
                         </Text>
                     </TouchableOpacity>
+
+                    {Platform.OS === 'ios' && (
+                        <TouchableOpacity
+                            activeOpacity={0.8}
+                            onPress={signInWithApple}
+                            style={{ backgroundColor: currentTheme.colors.text.primary }}
+                            className="w-full py-4 rounded-xl items-center flex-row justify-center shadow-lg shadow-white/10"
+                        >
+                            <Text
+                                style={{ color: currentTheme.colors.background, fontFamily: 'Outfit-Bold' }}
+                                className="text-lg"
+                            >
+                                Continue with Apple
+                            </Text>
+                        </TouchableOpacity>
+                    )}
 
                     <TouchableOpacity
                         onPress={() => router.back()}

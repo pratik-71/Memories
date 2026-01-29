@@ -1,6 +1,8 @@
+import RevenueCatService from '@/lib/revenuecat';
 import { supabase } from '@/lib/supabase';
 import { useSubscriptionStore } from '@/store/subscriptionStore';
 import { DarkTheme, ThemeProvider } from '@react-navigation/native';
+import * as NavigationBar from 'expo-navigation-bar';
 import * as Notifications from 'expo-notifications';
 import { Stack, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -82,8 +84,16 @@ export default function RootLayout() {
     useSubscriptionStore.getState().initialize();
 
     // Listen for auth state changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log(`Auth event: ${event}`);
+      if (event === 'SIGNED_IN' && session?.user) {
+        // Link RevenueCat user to Supabase ID
+        await RevenueCatService.logIn(session.user.id);
+        useSubscriptionStore.getState().initialize(); // Refresh sub status for this user
+      }
       if (event === 'SIGNED_OUT') {
+        // Clear RevenueCat user
+        await RevenueCatService.logOut();
         // Clear any specific stores if needed
       }
     });

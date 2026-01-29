@@ -23,7 +23,6 @@ export const ReviewModal = ({ visible, onClose }: ReviewModalProps) => {
             if (await StoreReview.hasAction()) {
                 await StoreReview.requestReview();
             } else {
-                // If native modal not supported/available, force fallback
                 throw new Error("Native review not available");
             }
         } catch (e) {
@@ -31,7 +30,7 @@ export const ReviewModal = ({ visible, onClose }: ReviewModalProps) => {
             // Fallback: Open Play Store / App Store
             const url = Platform.OS === 'android'
                 ? `market://details?id=com.venture.memories`
-                : `https://apps.apple.com/app/idYOUR_APP_ID`; // Update with actual iOS ID if known
+                : `https://apps.apple.com/app/id6739501550`; // Updated iOS ID
 
             Linking.openURL(url).catch(err => console.log("Failed to open store", err));
         } finally {

@@ -162,7 +162,7 @@ export default function EventDetails() {
     const handleShare = async () => {
         try {
             const result = await Share.share({
-                message: `Check out this special moment on Memories: ${event.title} - memories://event/${event.id}`,
+                message: `Check out this special moment on Memories: "${event.title}"\n\nTap to open in app:\nmemories://event/${event.id}\n\nGet the app on Play Store:\nhttps://play.google.com/store/apps/details?id=com.venture.memories`,
             });
         } catch (error: any) {
             Alert.alert(error.message);
@@ -252,8 +252,13 @@ export default function EventDetails() {
                 </TouchableOpacity>
                 <Text style={{ fontFamily: 'Outfit-Bold', color: 'white' }} className="text-lg">Memory Details</Text>
 
-                {/* Placeholder for alignment to keep title centered if needed, or just empty view */}
-                <View className="w-12" />
+                <TouchableOpacity
+                    onPress={handleShare}
+                    style={{ backgroundColor: '#18181b', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' }}
+                    className="w-12 h-12 rounded-full items-center justify-center"
+                >
+                    <Feather name="share" size={20} color="white" />
+                </TouchableOpacity>
             </View>
 
             <ScrollView contentContainerStyle={{ paddingBottom: 100 }}>
@@ -398,7 +403,7 @@ export default function EventDetails() {
                     className="flex-row items-center justify-center gap-6"
                 >
                     {/* Slot 1: Active=Pause, Completed=Share */}
-                    {!isLocked && (event.status !== 'completed' ? (
+                    {!isLocked && event.status !== 'completed' && (
                         <View className="items-center gap-2">
                             <TouchableOpacity
                                 onPress={handlePauseResume}
@@ -411,20 +416,7 @@ export default function EventDetails() {
                                 {event.status === 'paused' ? "Resume" : "Pause"}
                             </Text>
                         </View>
-                    ) : (
-                        <View className="items-center gap-2">
-                            <TouchableOpacity
-                                onPress={handleShare}
-                                style={{ backgroundColor: '#18181b', borderColor: 'rgba(255,255,255,0.1)' }}
-                                className="items-center justify-center w-14 h-14 rounded-full border active:bg-white/10"
-                            >
-                                <Feather name="share" size={20} color="white" />
-                            </TouchableOpacity>
-                            <Text style={{ fontFamily: 'Outfit-Medium', color: 'rgba(255,255,255,0.5)' }} className="text-[10px] uppercase tracking-wider">
-                                Share
-                            </Text>
-                        </View>
-                    ))}
+                    )}
 
                     {/* Slot 2: Active=Done, Completed=Hidden */}
                     {!isLocked && event.status !== 'completed' && (

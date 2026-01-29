@@ -6,7 +6,8 @@ import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import * as StoreReview from 'expo-store-review';
 import { useEffect, useState } from 'react';
-import { Alert, Dimensions, Image, ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, Dimensions, Image, Linking, Platform, ScrollView, Text, TouchableOpacity, View } from 'react-native';
+
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { supabase } from '../lib/supabase';
 
@@ -52,11 +53,25 @@ export default function Profile() {
     };
 
     const handleRateUs = async () => {
+        let openedNative = false;
         if (await StoreReview.hasAction()) {
             try {
                 await StoreReview.requestReview();
+                openedNative = true;
             } catch (error) {
                 console.log("Review Error:", error);
+            }
+        }
+
+        if (!openedNative) {
+            const url = Platform.OS === 'android'
+                ? `market://details?id=com.venture.memories`
+                : `https://apps.apple.com/app/id6739501550`; // Use actual ID or generic
+
+            try {
+                await Linking.openURL(url);
+            } catch (e) {
+                console.log("Link Error:", e);
             }
         }
 
@@ -73,13 +88,7 @@ export default function Profile() {
             icon: 'zap',
             action: () => router.push('/subscription')
         },
-        {
-            label: 'Rate Us',
-            value: !hasReviewed && !isPro ? 'Unlock +1 Memory' : undefined,
-            icon: 'star',
-            action: handleRateUs,
-            color: !hasReviewed && !isPro ? '#facc15' : undefined // Gold color for icon check
-        },
+
         {
             label: 'Privacy Policy',
             icon: 'lock',

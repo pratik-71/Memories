@@ -2,7 +2,7 @@
   "expo": {
     "name": "Memories",
     "slug": "memories",
-    "version": "1.0.9",
+    "version": "1.0.12",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "memories",
@@ -11,6 +11,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.venture.memories",
+      "usesAppleSignIn": true,
       "infoPlist": {
         "NSPhotoLibraryUsageDescription": "The app accesses your photos to let you set cover images for your special memories.",
         "NSCameraUsageDescription": "The app needs access to your camera to let you take photos for your memories.",
@@ -33,7 +34,7 @@
         "android.permission.SCHEDULE_EXACT_ALARM",
         "android.permission.POST_NOTIFICATIONS"
       ],
-      "versionCode": 9
+      "versionCode": 12
     },
     "web": {
       "output": "static",
@@ -66,6 +67,17 @@
         "expo-image-picker",
         {
           "photosPermission": "The app accesses your photos to let you set cover images for your special memories."
+        }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "enableR8": false,
+            "extraGradleProps": {
+              "org.gradle.jvmargs": "-Xmx4g -XX:MaxMetaspaceSize=1g"
+            }
+          }
         }
       ]
     ],

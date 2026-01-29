@@ -39,8 +39,12 @@ export async function scheduleEventNotifications(eventId: string, title: string,
     const eventDate = new Date(dateStr);
     const now = new Date();
 
-    // Helper to format numbers (1000 -> 1k, 1500 -> 1.5k)
+    // Helper to format numbers (1000 -> 1k, 1500 -> 1.5k, 1000000 -> 1M)
     const formatNumber = (num: number) => {
+        if (num >= 1000000) {
+            const m = num / 1000000;
+            return `${Number.isInteger(m) ? m : m.toFixed(1)}M`;
+        }
         if (num >= 1000) {
             const k = num / 1000;
             return `${Number.isInteger(k) ? k : k.toFixed(1)}k`;
@@ -86,22 +90,14 @@ export async function scheduleEventNotifications(eventId: string, title: string,
     }
 
     // 1. Minutes
-    // 100, 500, then every 500 starting from 1000
-    // Lifetime: 100 Years = ~52,560,000 minutes
-    // We can iterate this efficiently in JS
-    const minuteMilestones = [100, 500];
+    // Pattern: 100, then 1k, 2k, 3k... (Every 1000)
+    const minuteMilestones = [100];
     const MINUTE_LIMIT = 52560000; // ~100 years
-    for (let m = 1000; m <= MINUTE_LIMIT; m += 500) {
+    for (let m = 1000; m <= MINUTE_LIMIT; m += 1000) {
         minuteMilestones.push(m);
     }
+
     for (const mins of minuteMilestones) {
-        // Optimization: Check if this specific milestone is already past before creating Date object? 
-        // JS creates objects fast, but let's be safe.
-        // eventDate + mins * 60000 > now
-        // mins * 60000 > now - eventDate
-        // This check is implicitly done in addCandidate but doing it here might save Date allocs.
-        // For simplicity and robustness, currently just running the loop is fine for 100k items.
-        
         const trigger = new Date(eventDate.getTime() + mins * 60000);
         const label = formatNumber(mins);
         addCandidate(
@@ -114,13 +110,13 @@ export async function scheduleEventNotifications(eventId: string, title: string,
     }
 
     // 2. Hours
-    // 10, 50, 100, 500, then every 500
-    // Lifetime: 100 Years = ~876,000 hours
+    // Pattern: 10, 50, 100, 500, then 1k, 2k, 3k... (Every 1000)
     const hourMilestones = [10, 50, 100, 500];
-    const HOUR_LIMIT = 876000; 
-    for (let h = 1000; h <= HOUR_LIMIT; h += 500) {
+    const HOUR_LIMIT = 876000; // ~100 years
+    for (let h = 1000; h <= HOUR_LIMIT; h += 1000) {
         hourMilestones.push(h);
     }
+    
     for (const hours of hourMilestones) {
         const trigger = new Date(eventDate.getTime() + hours * 3600000);
         const label = formatNumber(hours);
@@ -133,28 +129,27 @@ export async function scheduleEventNotifications(eventId: string, title: string,
         );
     }
 
-    // 3. Days
-    // 1, 7, 50, 100, 500, then every 1000
-    // Lifetime: 100 Years = ~36,500 days
-    const dayMilestones = [1, 2, 3, 4, 5, 6, 7, 50, 100, 500];
-    for (let d = 1000; d <= 36500; d += 1000) {
-        dayMilestones.push(d);
-    }
-    for (const days of dayMilestones) {
+    // 3. Weeks (Replaces Days)
+    // Pattern: 1 week, 2 weeks, 3 weeks...
+    // Limit: ~100 years = ~5200 weeks
+    const WEEK_LIMIT = 5217;
+    for (let w = 1; w <= WEEK_LIMIT; w++) {
         const trigger = new Date(eventDate);
-        trigger.setDate(trigger.getDate() + days);
-        const label = formatNumber(days);
-        const suffix = days === 1 ? 'Day' : 'Days';
+        trigger.setDate(trigger.getDate() + (w * 7));
+        
+        const label = formatNumber(w);
+        const suffix = w === 1 ? 'Week' : 'Weeks';
         addCandidate(
             trigger,
             `✨ ${title}`,
             `🗓️ ${label} ${suffix} passed! Time to celebrate! 🥂`, 
-            `days-${days}`, 
+            `weeks-${w}`, 
             true
         );
     }
 
     // 4. Months & Years
+    // Pattern: 1 month, 2 months... (Every month)
     // Lifetime: 100 Years = 1200 months
     for (let i = 1; i <= 1200; i++) {
         const trigger = new Date(eventDate);
@@ -168,29 +163,67 @@ export async function scheduleEventNotifications(eventId: string, title: string,
         const months = i % 12;
 
         let label = "";
+        let idSuffix = "";
+        
         if (months === 0) {
+            // It's a full year
             label = `${years} Year${years > 1 ? 's' : ''} complete`;
+            idSuffix = `year-${years}`;
         } else {
-            const yStr = years > 0 ? `${years} Year${years > 1 ? 's' : ''} ` : "";
-            const mStr = `${months} Month${months > 1 ? 's' : ''}`;
-            label = `${yStr}${mStr} passed`;
+            // It's a month milestone
+            // User asked for "1 month, 2 month...". 
+            // If we want "Total Months Passed":
+            label = `${i} Month${i > 1 ? 's' : ''} passed`;
+            idSuffix = `month-${i}`;
         }
 
         addCandidate(
             trigger,
             `✨ ${title}`,
             `🏆 ${label}! Time to celebrate! 🎂`, 
-            `month-${i}`, 
+            idSuffix, 
             true
         );
     }
 
+    // DEDUPLICATION STEP:
+    // Prevent multiple notifications at the exact same time.
+    // Prioritize larger units (Year > Month > Week > Hour > Minute).
+    const uniqueCandidates = new Map<number, NotificationCandidate>();
+    
+    const getPriority = (idSuffix: string): number => {
+        if (idSuffix.startsWith('capsule')) return 6;
+        if (idSuffix.startsWith('year')) return 5;
+        if (idSuffix.startsWith('month')) return 4;
+        if (idSuffix.startsWith('weeks')) return 3;
+        if (idSuffix.startsWith('hours')) return 2;
+        if (idSuffix.startsWith('mins')) return 1;
+        return 0;
+    };
+
+    for (const candidate of candidates) {
+        const timeKey = candidate.triggerDate.getTime();
+        const existing = uniqueCandidates.get(timeKey);
+
+        if (!existing) {
+            uniqueCandidates.set(timeKey, candidate);
+        } else {
+            // Collision! Keep the higher priority one
+            if (getPriority(candidate.idSuffix) > getPriority(existing.idSuffix)) {
+                uniqueCandidates.set(timeKey, candidate);
+            }
+        }
+    }
+
+    // Convert back to array
+    const finalCandidates = Array.from(uniqueCandidates.values());
+
     // SORT candidates by Date (Ascending)
-    candidates.sort((a, b) => a.triggerDate.getTime() - b.triggerDate.getTime());
+    finalCandidates.sort((a, b) => a.triggerDate.getTime() - b.triggerDate.getTime());
 
     // TAKE the first 60 (System Limit Safeguard)
     // Most devices limit to 64. We use 60 to be safe and leave room for other apps/notifications.
-    const notificationsToSchedule = candidates.slice(0, 60);
+    const notificationsToSchedule = finalCandidates.slice(0, 60);
 
     // SCHEDULE them
     for (const item of notificationsToSchedule) {

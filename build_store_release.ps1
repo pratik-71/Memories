@@ -46,27 +46,31 @@ if (Test-Path "android\gradle.properties") {
     # Reduce workers to 1 to prevent Clang OOM
     Add-Content -Path "android\gradle.properties" -Value "org.gradle.workers.max=1"
     Add-Content -Path "android\gradle.properties" -Value "org.gradle.vfs.watch=false"
-    # Enable R8 Shrinking for smaller APK size
-    Add-Content -Path "android\gradle.properties" -Value "android.enableR8=true"
 }
 
 Write-Host "Configuring Release Signing..."
 # Check if keystore exists, if not, create it
-$keystorePath = "android\app\release.keystore"
-if (-not (Test-Path $keystorePath)) {
-    Write-Host "Creating new keystore for release signing..."
+# Check if keystore exists in ROOT, if not, create it there
+$rootKeystorePath = "release.keystore"
+$targetKeystorePath = "android\app\release.keystore"
+
+if (-not (Test-Path $rootKeystorePath)) {
+    Write-Host "Creating new keystore for release signing in ROOT folder..."
     Write-Host "You will be prompted to enter keystore details."
-    Write-Host "IMPORTANT: Remember the passwords and details you enter!"
-    Write-Host "CRITICAL: Save these credentials in a safe place - you'll need them for future updates!"
     
-    # Create keystore using keytool
-    keytool -genkeypair -v -storetype PKCS12 -keystore $keystorePath -alias memories-key-alias -keyalg RSA -keysize 2048 -validity 10000
+    # Create keystore in ROOT so it persists
+    keytool -genkeypair -v -storetype PKCS12 -keystore $rootKeystorePath -alias memories-key-alias -keyalg RSA -keysize 2048 -validity 10000
     
     if ($LASTEXITCODE -ne 0) {
         Write-Error "Failed to create keystore. Make sure JDK is installed."
         exit 1
     }
+} else {
+    Write-Host "Found existing release.keystore in root folder. Using it."
 }
+
+# Copy the safe root keystore to the android build folder
+Copy-Item -Path $rootKeystorePath -Destination $targetKeystorePath -Force
 
 # Add signing configuration to gradle.properties
 if (Test-Path "android\gradle.properties") {
@@ -74,7 +78,13 @@ if (Test-Path "android\gradle.properties") {
     Add-Content -Path "android\gradle.properties" -Value ""
     Add-Content -Path "android\gradle.properties" -Value "# Release Signing Configuration"
     Add-Content -Path "android\gradle.properties" -Value "MYAPP_RELEASE_STORE_FILE=release.keystore"
-    Add-Content -Path "android\gradle.properties" -Value "MYAPP_RELEASE_KEY_ALIAS=memories-key-alias"
+    
+    # Prompt for Key Alias (default to memories-key-alias)
+    $keyAliasInput = Read-Host "Enter the Key Alias (Press Enter for default: memories-key-alias)"
+    if ([string]::IsNullOrWhiteSpace($keyAliasInput)) {
+        $keyAliasInput = "memories-key-alias"
+    }
+    Add-Content -Path "android\gradle.properties" -Value "MYAPP_RELEASE_KEY_ALIAS=$keyAliasInput"
     
     # Prompt for passwords
     $storePassword = Read-Host "Enter the keystore password" -AsSecureString
@@ -113,7 +123,7 @@ if (Test-Path $buildGradlePath) {
     buildTypes {
         release {
             signingConfig signingConfigs.release
-            minifyEnabled true
+            minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
     }

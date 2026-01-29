@@ -275,41 +275,45 @@ export const useEventStore = create<EventState>()(
                      const remoteUrl = img.remote;
                      if (!remoteUrl) return;
 
-                     // Clean URL of query params or hashes which might interfere with path matching
+                     // Clean URL
                      const cleanUrl = remoteUrl.split('?')[0].split('#')[0];
 
-                     // Regex to extract bucket and path from probable Supabase public URL structure
-                     // URLs usually contain /public/{bucket}/{path} or .../storage/v1/object/public/{bucket}/{path}
-                     const match = cleanUrl.match(/\/public\/([^/]+)\/(.+)$/);
-                     
-                     if (match && match.length >= 3) {
-                         const bucketName = decodeURIComponent(match[1]);
-                         const path = decodeURIComponent(match[2]);
+                     let bucketName: string | null = null;
+                     let path: string | null = null;
+
+                     // 1. Explicitly check for 'Event Image' bucket (Primary)
+                     if (cleanUrl.includes('/Event%20Image/')) {
+                         bucketName = 'Event Image';
+                         path = cleanUrl.split('/Event%20Image/')[1];
+                     } else if (cleanUrl.includes('/Event Image/')) {
+                         bucketName = 'Event Image';
+                         path = cleanUrl.split('/Event Image/')[1];
+                     } 
+                     // 2. Legacy 'event-images' check
+                     else if (cleanUrl.includes('/event-images/')) {
+                         bucketName = 'event-images';
+                         path = cleanUrl.split('/event-images/')[1];
+                     }
+                     // 3. Fallback to Regex for other dynamic buckets
+                     else {
+                         const match = cleanUrl.match(/\/public\/([^/]+)\/(.+)$/);
+                         if (match && match.length >= 3) {
+                             bucketName = decodeURIComponent(match[1]);
+                             path = match[2];
+                         }
+                     }
+
+                     if (bucketName && path) {
+                         // Verify path is decoded (e.g. %20 -> space) and ensure we don't have leading slashes
+                         // split might leave a leading slash if not careful, but usually [1] of /Bucket/ is the content
+                         const finalPath = decodeURIComponent(path);
                          
                          if (!bucketMap[bucketName]) bucketMap[bucketName] = [];
-                         bucketMap[bucketName].push(path);
+                         bucketMap[bucketName].push(finalPath);
+                         
+                         console.log(`[deleteEvent] Queued for deletion: [${bucketName}] -> ${finalPath}`);
                      } else {
-                         // Fallback: Check known bucket patterns explicitly if regex fails
-                         let bucket: string | null = null;
-                         let path: string | null = null;
-
-                         if (cleanUrl.includes('/Event%20Image/')) {
-                             bucket = 'Event Image';
-                             path = decodeURIComponent(cleanUrl.split('/Event%20Image/')[1]);
-                         } else if (cleanUrl.includes('/Event Image/')) {
-                             bucket = 'Event Image';
-                             path = decodeURIComponent(cleanUrl.split('/Event Image/')[1]);
-                         } else if (cleanUrl.includes('/event-images/')) {
-                             bucket = 'event-images'; // Legacy
-                             path = decodeURIComponent(cleanUrl.split('/event-images/')[1]);
-                         }
-
-                         if (bucket && path) {
-                             if (!bucketMap[bucket]) bucketMap[bucket] = [];
-                             bucketMap[bucket].push(path);
-                         } else {
-                             console.warn(`[deleteEvent] Could not parse bucket/path from URL: ${remoteUrl}`);
-                         }
+                         console.warn(`[deleteEvent] Parsing failed for URL: ${remoteUrl}`);
                      }
                  });
 
