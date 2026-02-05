@@ -12,6 +12,8 @@ interface SubscriptionState {
   hasReviewed: boolean;
   
   activeProductId: string | null;
+  subscriptionType: 'Monthly' | 'Yearly' | 'Lifetime' | null;
+  expirationDate: string | null;
   
   initialize: () => Promise<void>;
   updateCustomerInfo: (customerInfo: CustomerInfo) => void;
@@ -25,6 +27,8 @@ export const useSubscriptionStore = create<SubscriptionState>()(
     (set, get) => ({
       isPro: false,
       activeProductId: null,
+      subscriptionType: null,
+      expirationDate: null,
       offerings: null,
       isLoading: false,
       isRestoring: false,
@@ -36,37 +40,46 @@ export const useSubscriptionStore = create<SubscriptionState>()(
         set({ isLoading: true });
         try {
             await RevenueCatService.init();
-            const offerings = await RevenueCatService.getOfferings();
-            const customerInfo = await RevenueCatService.getCustomerInfo();
             
+            // 1. Get offerings first so they show up immediately
+            const offerings = await RevenueCatService.getOfferings();
+            set({ offerings });
+            
+            // 2. Refresh customer info to get latest status (Entitlements)
+            const customerInfo = await RevenueCatService.refreshCustomerInfo();
             if (customerInfo) {
                 get().updateCustomerInfo(customerInfo);
             }
-            
-            set({ offerings });
         } catch (e) {
-            console.error("Subscription store init error", e);
+            // Error silently ignored for production
         } finally {
             set({ isLoading: false });
         }
       },
 
       updateCustomerInfo: (customerInfo: CustomerInfo) => {
-        const activeEntitlements = Object.keys(customerInfo.entitlements.active);
-        console.log("🕵️‍♂️ [Subscription] Active Entitlements on Device:", JSON.stringify(activeEntitlements));
-        
         // Check for "pro" entitlement (check all possible variations)
-        const entitlement = customerInfo.entitlements.active['Memories Pro'] || 
-                           customerInfo.entitlements.active['Memories pro'] ||
-                           customerInfo.entitlements.active['memories_pro'] ||
-                           customerInfo.entitlements.active['pro']; 
-
+        const allActiveKeys = Object.keys(customerInfo.entitlements.active);
+        const proEntitlementKey = allActiveKeys.find(key => 
+          ['pro', 'premium', 'memories pro', 'memories_pro', 'memories-pro'].includes(key.toLowerCase())
+        );
+        
+        const entitlement = proEntitlementKey ? customerInfo.entitlements.active[proEntitlementKey] : null;
         const isPro = !!entitlement;
-        console.log("💎 [Subscription] Is User Pro?", isPro ? "YES ✅" : "NO ❌");
+
+        let type: 'Monthly' | 'Yearly' | 'Lifetime' | null = null;
+        if (entitlement) {
+          const id = entitlement.productIdentifier.toLowerCase();
+          if (id.includes('lifetime')) type = 'Lifetime';
+          else if (id.includes('yearly') || id.includes('annual')) type = 'Yearly';
+          else type = 'Monthly';
+        }
 
         set({ 
             isPro: isPro,
-            activeProductId: entitlement?.productIdentifier ?? null
+            activeProductId: entitlement?.productIdentifier ?? null,
+            subscriptionType: type,
+            expirationDate: entitlement?.expirationDate ?? null
         });
       },
 
@@ -80,7 +93,6 @@ export const useSubscriptionStore = create<SubscriptionState>()(
           }
           return false;
         } catch (error) {
-            console.error("Purchase error", error);
             return false;
         } finally {
           set({ isLoading: false });
@@ -97,7 +109,6 @@ export const useSubscriptionStore = create<SubscriptionState>()(
           }
           return false;
         } catch (error) {
-            console.error("Restore error", error);
             return false;
         } finally {
           set({ isRestoring: false });

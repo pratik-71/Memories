@@ -2,7 +2,7 @@
   "expo": {
     "name": "Memories",
     "slug": "memories",
-    "version": "1.0.14",
+    "version": "1.0.15",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "memories",
@@ -35,7 +35,7 @@
         "android.permission.SCHEDULE_EXACT_ALARM",
         "android.permission.POST_NOTIFICATIONS"
       ],
-      "versionCode": 14
+      "versionCode": 15
     },
     "web": {
       "output": "static",

@@ -1,8 +1,8 @@
 import { Platform } from 'react-native';
 import Purchases, {
-    CustomerInfo,
-    PurchasesOffering,
-    PurchasesPackage
+  CustomerInfo,
+  PurchasesOffering,
+  PurchasesPackage
 } from 'react-native-purchases';
 
 const API_KEYS = {
@@ -11,16 +11,26 @@ const API_KEYS = {
 };
 
 class RevenueCatService {
+  private static isInitialized = false;
+
   /**
    * Initialize RevenueCat SDK
    */
   static async init() {
+    if (this.isInitialized) return;
+
     // Purchases.setLogLevel(LOG_LEVEL.DEBUG);
 
     if (Platform.OS === 'ios') {
-       if (API_KEYS.apple) Purchases.configure({ apiKey: API_KEYS.apple });
+       if (API_KEYS.apple && API_KEYS.apple !== 'appl_placeholder') {
+         Purchases.configure({ apiKey: API_KEYS.apple });
+         this.isInitialized = true;
+       }
     } else if (Platform.OS === 'android') {
-       if (API_KEYS.google) Purchases.configure({ apiKey: API_KEYS.google });
+       if (API_KEYS.google && API_KEYS.google !== 'goog_placeholder') {
+         Purchases.configure({ apiKey: API_KEYS.google });
+         this.isInitialized = true;
+       }
     }
   }
 
@@ -30,17 +40,11 @@ class RevenueCatService {
   static async getOfferings(): Promise<PurchasesOffering | null> {
     try {
       const offerings = await Purchases.getOfferings();
-      console.log("📦 [RevenueCat] ALL Offerings fetched:", JSON.stringify(offerings, null, 2));
-      
       if (offerings.current !== null) {
-        console.log("✅ [RevenueCat] Current Offering found:", offerings.current.identifier);
         return offerings.current;
-      } else {
-        console.warn("⚠️ [RevenueCat] No 'current' offering configured in RevenueCat dashboard.");
       }
       return null;
     } catch (e) {
-      console.error('Error getting offerings', e);
       return null;
     }
   }
@@ -53,9 +57,6 @@ class RevenueCatService {
       const { customerInfo } = await Purchases.purchasePackage(pack);
       return customerInfo;
     } catch (e: any) {
-      if (!e.userCancelled) {
-        console.error('Error purchasing package', e);
-      }
       return null;
     }
   }
@@ -68,7 +69,6 @@ class RevenueCatService {
       const customerInfo = await Purchases.restorePurchases();
       return customerInfo;
     } catch (e) {
-      console.error('Error restoring purchases', e);
       return null;
     }
   }
@@ -81,10 +81,22 @@ class RevenueCatService {
           const customerInfo = await Purchases.getCustomerInfo();
           return customerInfo;
       } catch (e) {
-          console.error("Error getting customer info", e)
           return null;
       }
   }
+
+  /**
+   * Force refresh customer info from server
+   */
+  static async refreshCustomerInfo(): Promise<CustomerInfo | null> {
+      try {
+          await Purchases.invalidateCustomerInfoCache();
+          return await this.getCustomerInfo();
+      } catch (e) {
+          return await this.getCustomerInfo();
+      }
+  }
+
   /**
    * Log in a user with a specific App User ID (Supabase ID)
    */
@@ -94,10 +106,8 @@ class RevenueCatService {
           if (email) {
               await Purchases.setEmail(email);
           }
-          console.log("✅ [RevenueCat] Logged in as:", userId, email ? `(${email})` : "");
           return customerInfo;
       } catch (e) {
-          console.error("❌ [RevenueCat] Error logging in:", e);
           return null;
       }
   }
@@ -108,11 +118,21 @@ class RevenueCatService {
   static async logOut(): Promise<CustomerInfo | null> {
       try {
           const customerInfo = await Purchases.logOut();
-          console.log("👋 [RevenueCat] Logged out");
           return customerInfo;
       } catch (e) {
-          console.error("❌ [RevenueCat] Error logging out:", e);
           return null;
+      }
+  }
+
+  /**
+   * Get current App User ID
+   */
+  static async getAppUserId(): Promise<string> {
+      try {
+          const appUserId = await Purchases.getAppUserID();
+          return appUserId;
+      } catch (e) {
+          return "unknown";
       }
   }
 }

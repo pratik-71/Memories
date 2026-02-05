@@ -77,7 +77,7 @@ export default function RootLayout() {
         NavigationBar.setVisibilityAsync("hidden");
         NavigationBar.setBehaviorAsync("overlay-swipe");
       } catch (e) {
-        console.log("NavigationBar module not found or failed (this is expected if native code hasn't finished rebuilding):", e);
+        // Silent
       }
     }
     SystemUI.setBackgroundColorAsync("black");
@@ -86,16 +86,17 @@ export default function RootLayout() {
 
     // Listen for auth state changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log(`Auth event: ${event}`);
-      if (event === 'SIGNED_IN' && session?.user) {
+      if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION') && session?.user) {
         // Link RevenueCat user to Supabase ID and email
         await RevenueCatService.logIn(session.user.id, session.user.email);
-        useSubscriptionStore.getState().initialize(); // Refresh sub status for this user
+        await useSubscriptionStore.getState().initialize(); // Refresh sub status for this user
       }
+
       if (event === 'SIGNED_OUT') {
         // Clear RevenueCat user
         await RevenueCatService.logOut();
-        // Clear any specific stores if needed
+        // Clear store state
+        useSubscriptionStore.setState({ isPro: false, activeProductId: null });
       }
     });
 
@@ -104,14 +105,12 @@ export default function RootLayout() {
       try {
         const { error } = await supabase.auth.getSession();
         if (error) {
-          console.log("Session error:", error.message);
           if (error.message.includes("Invalid Refresh Token") || error.message.includes("Already Used")) {
-            console.log("Session invalid, forcing sign out...");
             await supabase.auth.signOut();
           }
         }
       } catch (e) {
-        console.log("Session check error:", e);
+        // Silent
       }
     };
     checkSession();

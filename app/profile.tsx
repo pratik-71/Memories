@@ -1,4 +1,4 @@
-import ContactModal from '@/components/ContactModal';
+import FeedbackModal from '@/components/FeedbackModal';
 import { useSubscriptionStore } from '@/store/subscriptionStore';
 import { useThemeStore } from '@/store/themeStore';
 import { Feather } from '@expo/vector-icons';
@@ -20,8 +20,8 @@ export default function Profile() {
     const currentTheme = useThemeStore((state) => state.currentTheme);
     const [user, setUser] = useState<any>(null);
     const [loading, setLoading] = useState(true);
-    const [contactModalVisible, setContactModalVisible] = useState(false);
-    const { isPro, hasReviewed, setReviewed } = useSubscriptionStore();
+    const [feedbackModalVisible, setFeedbackModalVisible] = useState(false);
+    const { isPro, hasReviewed, setReviewed, subscriptionType, expirationDate } = useSubscriptionStore();
 
     useEffect(() => {
         getProfile();
@@ -32,7 +32,7 @@ export default function Profile() {
             const { data: { user } } = await supabase.auth.getUser();
             setUser(user);
         } catch (error) {
-            console.log('Error fetching user:', error);
+            // Silent
         } finally {
             setLoading(false);
         }
@@ -47,7 +47,7 @@ export default function Profile() {
             try {
                 await GoogleSignin.signOut();
             } catch (e) {
-                console.log("Google SignOut error or not signed in with Google:", e);
+                // Silent
             }
 
             // Clear auto sign-in provider so it doesn't auto-login next time
@@ -68,7 +68,7 @@ export default function Profile() {
                 await StoreReview.requestReview();
                 openedNative = true;
             } catch (error) {
-                console.log("Review Error:", error);
+                // Silent
             }
         }
 
@@ -80,7 +80,7 @@ export default function Profile() {
             try {
                 await Linking.openURL(url);
             } catch (e) {
-                console.log("Link Error:", e);
+                // Silent
             }
         }
 
@@ -90,27 +90,25 @@ export default function Profile() {
         }
     };
 
+
     const menuItems = [
         {
             label: 'Subscription',
-            value: isPro ? 'Premium Active' : 'Free Plan',
+            value: isPro
+                ? `${subscriptionType}${expirationDate ? ` • ${new Date(expirationDate).toLocaleDateString()}` : ''}`
+                : 'Free Plan',
             icon: 'zap',
             action: () => router.push('/subscription')
         },
         {
+            label: 'Feedback',
+            icon: 'message-square',
+            action: () => setFeedbackModalVisible(true)
+        },
+        {
             label: 'Contact Us',
-            icon: 'message-circle',
-            action: () => setContactModalVisible(true)
-        },
-        {
-            label: 'Privacy Policy',
-            icon: 'lock',
-            action: () => router.push('/privacy-policy')
-        },
-        {
-            label: 'Terms and Conditions',
-            icon: 'file-text',
-            action: () => router.push('/terms-conditions')
+            icon: 'mail',
+            action: () => Linking.openURL('https://zenvy-venture.vercel.app/contact-us?project=Memories')
         },
     ];
 
@@ -165,7 +163,7 @@ export default function Profile() {
                 </Animated.View>
 
                 {/* Menu Items */}
-                <View className="px-6 space-y-4">
+                <View className="px-6 space-y-4 gap-4">
                     {menuItems.map((item, index) => (
                         <Animated.View
                             key={index}
@@ -178,7 +176,7 @@ export default function Profile() {
                                     borderColor: 'rgba(255,255,255,0.05)',
                                     borderWidth: 1
                                 }}
-                                className="flex-row items-center p-4 rounded-2xl active:bg-white/5"
+                                className="flex-row items-center p-4 gap-2 rounded-2xl active:bg-white/5"
                             >
                                 <View className="w-10 h-10 rounded-full bg-white/5 items-center justify-center mr-4">
                                     <Feather name={item.icon as any} size={20} color={currentTheme.colors.text.primary} />
@@ -221,10 +219,10 @@ export default function Profile() {
                 </TouchableOpacity>
             </Animated.View>
 
-            {/* Contact Modal */}
-            <ContactModal
-                visible={contactModalVisible}
-                onClose={() => setContactModalVisible(false)}
+            {/* Feedback Modal */}
+            <FeedbackModal
+                visible={feedbackModalVisible}
+                onClose={() => setFeedbackModalVisible(false)}
             />
         </View>
     );

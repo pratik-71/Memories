@@ -4,12 +4,12 @@ import { Alert, Modal, ScrollView, Text, TextInput, TouchableOpacity, View } fro
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { supabase } from '../lib/supabase';
 
-interface ContactModalProps {
+interface FeedbackModalProps {
     visible: boolean;
     onClose: () => void;
 }
 
-export default function ContactModal({ visible, onClose }: ContactModalProps) {
+export default function FeedbackModal({ visible, onClose }: FeedbackModalProps) {
     const [fullName, setFullName] = useState('');
     const [email, setEmail] = useState('');
     const [message, setMessage] = useState('');
@@ -74,7 +74,7 @@ export default function ContactModal({ visible, onClose }: ContactModalProps) {
                 ]
             );
         } catch (error: any) {
-            console.error('Contact form error:', error);
+            console.error('Feedback form error:', error);
             Alert.alert('Error', 'Failed to submit your feedback. Please try again.');
         } finally {
             setIsSubmitting(false);
@@ -97,7 +97,7 @@ export default function ContactModal({ visible, onClose }: ContactModalProps) {
                         <Feather name="x" size={24} color="white" />
                     </TouchableOpacity>
                     <Text style={{ color: 'white', fontFamily: 'Outfit-Bold' }} className="text-3xl">
-                        Contact Us
+                        Feedback
                     </Text>
                     <View className="w-10" />
                 </View>
@@ -216,11 +216,11 @@ export default function ContactModal({ visible, onClose }: ContactModalProps) {
                         }}
                         className="w-full py-4 rounded-2xl items-center shadow-lg shadow-black/50"
                     >
-                        <Text 
-                            style={{ 
-                                color: isSubmitting ? 'rgba(255,255,255,0.5)' : 'black', 
-                                fontFamily: 'Outfit-Bold' 
-                            }} 
+                        <Text
+                            style={{
+                                color: isSubmitting ? 'rgba(255,255,255,0.5)' : 'black',
+                                fontFamily: 'Outfit-Bold'
+                            }}
                             className="text-base font-bold tracking-wide"
                         >
                             {isSubmitting ? 'Submitting...' : 'Submit Feedback'}

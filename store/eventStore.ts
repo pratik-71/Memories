@@ -78,7 +78,6 @@ export const useEventStore = create<EventState>()(
 
           set({ events: mappedEvents });
         } catch (err: any) {
-             console.error('Fetch error:', err);
              set({ error: err.message });
         } finally {
           set({ isLoading: false });
@@ -118,7 +117,7 @@ export const useEventStore = create<EventState>()(
                  });
              }
          } catch (err) {
-             console.error("Failed to fetch full event details", err);
+             // Error silently ignored
          }
       },
 
@@ -182,7 +181,6 @@ export const useEventStore = create<EventState>()(
                         // Return hybrid object with both paths
                         return { local: localUri, remote: publicUrl } as EventImage;
                     } catch (uploadErr) {
-                        console.error('Image upload failed:', uploadErr);
                         return null; 
                     }
                 });
@@ -210,7 +208,6 @@ export const useEventStore = create<EventState>()(
             if (error) {
                 // Check if specific "missing column" error
                 if (error.code === 'PGRST204') {
-                     console.warn("Retrying insert without 'images' column (Schema mismatch). Images saved to Storage but reference lost in DB.");
                      // Retry without images to at least save the event text data
                      const { images, ...fallbackEvent } = newEvent;
                      const { data: fallbackData, error: fallbackError } = await supabase
@@ -252,7 +249,6 @@ export const useEventStore = create<EventState>()(
             return mappedEvent.id;
 
         } catch (err: any) {
-            console.error('Add error:', err);
             set({ error: err.message });
             throw err; 
         } finally {
@@ -308,13 +304,9 @@ export const useEventStore = create<EventState>()(
                  // Delete from each bucket found
                  const deletePromises = Object.entries(bucketMap).map(async ([bucket, paths]) => {
                      if (paths.length > 0) {
-                         const { error: storageError } = await supabase.storage
+                          await supabase.storage
                             .from(bucket)
                             .remove(paths);
-                         
-                          if (storageError) {
-                              console.error('[deleteEvent] Storage deletion failed:', storageError);
-                          }
                       }
                   });
                  
@@ -334,8 +326,6 @@ export const useEventStore = create<EventState>()(
                       }
                   });
                   await Promise.all(localDeletePromises);
-              } else {
-                  // No images to clean up
               }
 
                // 3. Cancel Notifications
@@ -352,7 +342,6 @@ export const useEventStore = create<EventState>()(
                  events: state.events.filter((e) => e.id !== id),
              }));
          } catch (err: any) {
-             console.error('Delete error:', err);
              set({ error: err.message });
          } finally {
              set({ isLoading: false });
@@ -399,7 +388,6 @@ export const useEventStore = create<EventState>()(
               }));
 
           } catch (err: any) {
-              console.error("Pause/Resume error:", err);
               set({ error: err.message });
           } finally {
               set({ isLoading: false });
@@ -430,7 +418,6 @@ export const useEventStore = create<EventState>()(
               }));
 
           } catch (err: any) {
-              console.error("Complete error", err);
               set({ error: err.message });
           } finally {
               set({ isLoading: false });
@@ -486,7 +473,6 @@ export const useEventStore = create<EventState>()(
                         // Return hybrid object
                         return { local: localUri, remote: publicUrl } as EventImage;
                      } catch (e) {
-                         console.error("Upload failed in update:", e);
                          return null;
                      }
                   });
@@ -507,8 +493,6 @@ export const useEventStore = create<EventState>()(
                   });
 
                   if (removedImages.length > 0) {
-                      console.log(`🚀 [updateEvent] Cleaning up ${removedImages.length} removed images`);
-                      
                       const bucketMap: Record<string, string[]> = {};
                       removedImages.forEach(img => {
                           const remoteUrl = typeof img === 'string' ? img : img.remote;
@@ -539,15 +523,7 @@ export const useEventStore = create<EventState>()(
 
                       const storageDeletePromises = Object.entries(bucketMap).map(async ([bucket, paths]) => {
                           if (paths.length > 0) {
-                              console.log(`🗑️ [updateEvent] Calling supabase.storage.from('${bucket}').remove(${JSON.stringify(paths)})`);
-                              const { data: deleteData, error: storageError } = await supabase.storage.from(bucket).remove(paths);
-                              if (storageError) {
-                                  console.error(`❌ [updateEvent] Supabase Error:`, storageError);
-                              } else if (!deleteData || deleteData.length === 0) {
-                                  console.warn(`⚠️ [updateEvent] No files were deleted. Check your Supabase DELETE policies!`);
-                              } else {
-                                  console.log(`✨ [updateEvent] Successfully deleted ${deleteData.length} files:`, deleteData);
-                              }
+                              await supabase.storage.from(bucket).remove(paths);
                           }
                       });
                       await Promise.all(storageDeletePromises);
@@ -561,7 +537,7 @@ export const useEventStore = create<EventState>()(
                                       await FileSystem.deleteAsync(img.local, { idempotent: true });
                                   }
                               } catch (err) {
-                                  console.warn("[updateEvent] Local cleanup failed", err);
+                                  // Silent
                               }
                           }
                       });
@@ -602,7 +578,6 @@ export const useEventStore = create<EventState>()(
               
               if (error) {
                     if (error.code === 'PGRST204') {
-                         console.warn("Retrying update without 'images' column.");
                          const { images, ...fallbackUpdates } = finalUpdates;
                          const { error: fallbackError } = await supabase
                             .from('events')
@@ -611,7 +586,6 @@ export const useEventStore = create<EventState>()(
                          if (fallbackError) throw fallbackError;
                          return;
                     }
-                  console.warn("Supabase update failed:", error.message);
                   set({ error: error.message });
               } else if (data) {
                  const mapped = {
@@ -627,7 +601,6 @@ export const useEventStore = create<EventState>()(
               }
 
           } catch (err: any) {
-              console.error("Update error:", err);
               set({ error: err.message });
           } finally {
               set({ isLoading: false });
@@ -639,12 +612,6 @@ export const useEventStore = create<EventState>()(
           const localEvent = get().events.find(e => e.id === id);
           if (localEvent) return localEvent;
 
-          // If not found (e.g. shared link), try RPC call or direct select
-          // We utilize the custom function for security bypass if it's a shared link scenario,
-          // OR standard select if it's just sync lag.
-          // For now, standard select (User's own event).
-          // If we really implement "Shared Links", we'd call 'get_shared_event' rpc here.
-          
           const { data, error } = await supabase.rpc('get_shared_event', { lookup_id: id });
           
            if (data && data.length > 0) {

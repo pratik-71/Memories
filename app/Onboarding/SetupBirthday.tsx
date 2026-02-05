@@ -38,7 +38,7 @@ export default function SetupBirthday() {
                 return;
             }
         } catch (e) {
-            console.log("Check user error:", e);
+            // Silent
         } finally {
             setIsChecking(false);
         }
@@ -63,7 +63,6 @@ export default function SetupBirthday() {
 
             router.replace('/home');
         } catch (error: any) {
-            console.error(error);
             if (error.message.includes("Limit Reached")) {
                 Alert.alert("Limit Reached", "You already have an event. Skipping birthday setup.");
                 router.replace('/home');

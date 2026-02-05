@@ -159,15 +159,15 @@ export default function EventDetails() {
         router.push({ pathname: "/edit-event", params: { id: event.id } });
     };
 
-    const handleShare = async () => {
-        try {
-            const result = await Share.share({
-                message: `Check out this special moment on Memories: "${event.title}"\n\nTap to open in app:\nmemories://event/${event.id}\n\nGet the app on Play Store:\nhttps://play.google.com/store/apps/details?id=com.venture.memories`,
-            });
-        } catch (error: any) {
-            Alert.alert(error.message);
-        }
-    };
+    // const handleShare = async () => {
+    //     try {
+    //         const result = await Share.share({
+    //             message: `Check out this special moment on Memories: "${event.title}"\n\nTap to open in app:\nmemories://event/${event.id}\n\nGet the app on Play Store:\nhttps://play.google.com/store/apps/details?id=com.venture.memories`,
+    //         });
+    //     } catch (error: any) {
+    //         Alert.alert(error.message);
+    //     }
+    // };
 
     const handlePauseResume = async () => {
         if (typeof id === 'string') {
@@ -253,11 +253,11 @@ export default function EventDetails() {
                 <Text style={{ fontFamily: 'Outfit-Bold', color: 'white' }} className="text-lg">Memory Details</Text>
 
                 <TouchableOpacity
-                    onPress={handleShare}
-                    style={{ backgroundColor: '#18181b', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' }}
+                    // onPress={handleShare}
+                    // style={{ backgroundColor: '#18181b', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' }}
                     className="w-12 h-12 rounded-full items-center justify-center"
                 >
-                    <Feather name="share" size={20} color="white" />
+                    {/* <Feather name="share" size={20} color="white" /> */}
                 </TouchableOpacity>
             </View>
 

@@ -11,7 +11,7 @@ import * as AppleAuthentication from 'expo-apple-authentication';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Dimensions, Image, Platform, ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, Dimensions, Image, Linking, Platform, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { supabase } from '../../lib/supabase';
 
@@ -47,7 +47,6 @@ export default function SignIn() {
                 router.replace('/Onboarding/SetupBirthday');
             }
         } catch (error) {
-            console.error('Error during post-login navigation:', error);
             // Fallback to boarding if check fails, it will redirect anyway if needed
             router.replace('/Onboarding/SetupBirthday');
         }
@@ -64,7 +63,7 @@ export default function SignIn() {
                 signInWithGoogle(true);
             }
         } catch (e) {
-            console.log('Auto sign-in check failed:', e);
+            // Silent
         } finally {
             setHasAttemptedAutoSignIn(true);
         }
@@ -76,7 +75,17 @@ export default function SignIn() {
         setIsLoggingIn(true);
         try {
             await GoogleSignin.hasPlayServices();
-            const userInfo = await GoogleSignin.signIn();
+
+            let userInfo;
+            if (auto) {
+                userInfo = await GoogleSignin.signInSilently();
+            } else {
+                // Force account picker for manual sign-in
+                try {
+                    await GoogleSignin.signOut();
+                } catch (e) { }
+                userInfo = await GoogleSignin.signIn();
+            }
 
             if (userInfo.data?.idToken) {
                 const { data, error } = await supabase.auth.signInWithIdToken({
@@ -92,20 +101,26 @@ export default function SignIn() {
                     await useSubscriptionStore.getState().initialize();
                     await handleNavigationAfterSignIn();
                 }
-            } else {
-                throw new Error('no ID token present!');
+            } else if (!auto) {
+                throw new Error('No ID token present!');
             }
 
         } catch (error: any) {
             if (error.code === statusCodes.SIGN_IN_CANCELLED) {
+                // User cancelled, do nothing
             } else if (error.code === statusCodes.IN_PROGRESS) {
+                // Already in progress
             } else if (error.code === statusCodes.PLAY_SERVICES_NOT_AVAILABLE) {
-                Alert.alert("Error", "Play services not available");
+                if (!auto) Alert.alert("Error", "Play services not available");
             } else {
                 if (!auto) Alert.alert("Google Sign In Error", error.message);
             }
         } finally {
-            setIsLoggingIn(false);
+            // Only set to false if we didn't successfully navigate
+            // (Wait a bit to prevent flashing back to the button text)
+            setTimeout(() => {
+                setIsLoggingIn(false);
+            }, 1000);
         }
     };
 
@@ -147,7 +162,9 @@ export default function SignIn() {
                 if (!auto) Alert.alert('Error', e.message);
             }
         } finally {
-            setIsLoggingIn(false);
+            setTimeout(() => {
+                setIsLoggingIn(false);
+            }, 1000);
         }
     };
 
@@ -239,6 +256,30 @@ export default function SignIn() {
                         </TouchableOpacity>
                     )}
 
+                    <View className="items-center px-4 mt-2">
+                        <Text
+                            style={{ color: 'rgba(255,255,255,0.4)', fontFamily: 'Outfit-Regular' }}
+                            className="text-[11px] text-center leading-4"
+                        >
+                            By signing in, you accept our{' '}
+                            <Text
+                                onPress={() => Linking.openURL('https://zenvy-venture.vercel.app/memories/terms-conditions')}
+                                style={{ color: currentTheme.colors.text.primary }}
+                                className="underline"
+                            >
+                                Terms & Conditions
+                            </Text>
+                            {' '}and{' '}
+                            <Text
+                                onPress={() => Linking.openURL('https://zenvy-venture.vercel.app/memories/privacy-policy')}
+                                style={{ color: currentTheme.colors.text.primary }}
+                                className="underline"
+                            >
+                                Privacy Policy
+                            </Text>
+                        </Text>
+                    </View>
+
                     <TouchableOpacity
                         onPress={() => router.back()}
                         className="items-center py-2"
@@ -249,6 +290,25 @@ export default function SignIn() {
                     </TouchableOpacity>
                 </Animated.View>
             </ScrollView>
+
+            {/* Global Loading Overlay */}
+            {isLoggingIn && (
+                <Animated.View
+                    entering={FadeInDown}
+                    style={{ backgroundColor: 'rgba(0,0,0,0.7)' }}
+                    className="absolute inset-0 items-center justify-center z-50"
+                >
+                    <View className="bg-zinc-900 p-8 rounded-3xl items-center shadow-2xl border border-white/10">
+                        <ActivityIndicator size="large" color={currentTheme.colors.primary} />
+                        <Text style={{ fontFamily: 'Outfit-Bold', color: 'white' }} className="mt-4 text-lg">
+                            Signing you in...
+                        </Text>
+                        <Text style={{ fontFamily: 'Outfit-Regular', color: 'rgba(255,255,255,0.5)' }} className="mt-1">
+                            Please wait a moment
+                        </Text>
+                    </View>
+                </Animated.View>
+            )}
         </View>
     );
 }

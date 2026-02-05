@@ -4,7 +4,7 @@ import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
-import { Dimensions, Image, ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import { Dimensions, Image, Linking, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 
 const { width } = Dimensions.get('window');
@@ -19,6 +19,8 @@ export default function Subscription() {
         restorePurchases,
         isPro,
         activeProductId,
+        subscriptionType,
+        expirationDate,
         isLoading,
         initialize
     } = useSubscriptionStore();
@@ -45,21 +47,23 @@ export default function Subscription() {
 
                 {/* Main Content */}
                 <View className="flex-1 items-center pt-2 pb-10 px-6">
-                    {/* Hero Image */}
-                    <Animated.View
-                        entering={FadeInDown.delay(200).springify()}
-                        className="items-center justify-center mb-6 shadow-2xl shadow-black"
-                    >
-                        <Image
-                            source={require('@/assets/onboarding/subscription.png')}
-                            style={{
-                                width: width * 1.2,
-                                height: width * 0.45,
-                                opacity: 0.9
-                            }}
-                            resizeMode="contain"
-                        />
-                    </Animated.View>
+                    {/* Hero Image - Hide if subscribed */}
+                    {!isPro && (
+                        <Animated.View
+                            entering={FadeInDown.delay(200).springify()}
+                            className="items-center justify-center mb-6 shadow-2xl shadow-black"
+                        >
+                            <Image
+                                source={require('@/assets/onboarding/subscription.png')}
+                                style={{
+                                    width: width * 1.2,
+                                    height: width * 0.45,
+                                    opacity: 0.9
+                                }}
+                                resizeMode="contain"
+                            />
+                        </Animated.View>
+                    )}
 
                     {(() => {
                         // Logic to determine view state
@@ -101,43 +105,105 @@ export default function Subscription() {
                         }
 
                         // If ANY other Pro plan is active (Monthly or Yearly)
-                        if (isPro) {
+                        if (isPro && !isLifetimeActive) {
                             return (
-                                <Animated.View entering={FadeInDown.delay(300).springify()} className="w-full items-center py-8 px-4">
-                                    <View className="w-20 h-20 bg-green-500/20 rounded-full items-center justify-center mb-6">
-                                        <Feather name="check" size={40} color="#4ade80" />
-                                    </View>
-                                    <Text style={{ fontFamily: 'Outfit-Bold', color: 'white' }} className="text-2xl mb-2 text-center">
-                                        Premium Active
-                                    </Text>
-                                    <Text style={{ fontFamily: 'Outfit-Regular', color: 'rgba(255,255,255,0.6)' }} className="text-center text-base mb-8">
-                                        You are a Memories Pro user. Enjoy unlimited slots and all features!
-                                    </Text>
-
-                                    <TouchableOpacity
-                                        onPress={() => router.back()}
-                                        style={{ backgroundColor: currentTheme.colors.primary }}
-                                        className="w-full py-4 rounded-3xl items-center shadow-lg shadow-emerald-500/20"
-                                    >
-                                        <Text style={{ fontFamily: 'Outfit-Bold', color: '#000' }} className="text-base">
-                                            Start Creating
+                                <View className="w-full">
+                                    <Animated.View entering={FadeInDown.delay(300).springify()} className="w-full items-center py-6 px-4 bg-green-500/5 rounded-3xl border border-green-500/10 mb-8">
+                                        <View className="w-16 h-16 bg-green-500/20 rounded-full items-center justify-center mb-4">
+                                            <Feather name="check" size={32} color="#4ade80" />
+                                        </View>
+                                        <Text style={{ fontFamily: 'Outfit-Bold', color: 'white' }} className="text-xl mb-1 text-center">
+                                            Premium Active
                                         </Text>
-                                    </TouchableOpacity>
+                                        <Text style={{ fontFamily: 'Outfit-Regular', color: 'rgba(255,255,255,0.6)' }} className="text-center text-sm mb-4">
+                                            You're on the {subscriptionType} plan.
+                                            {expirationDate && `\nRenews/Expires: ${new Date(expirationDate).toLocaleDateString()}`}
+                                        </Text>
 
-                                    {!isLifetimeActive && offerings && (
-                                        <TouchableOpacity
-                                            onPress={() => {
-                                                // Handle showing upgrade options if they want to switch
-                                                // For now just stay on success screen
-                                            }}
-                                            className="mt-8"
-                                        >
-                                            <Text style={{ fontFamily: 'Outfit-Medium', color: 'rgba(255,255,255,0.4)', fontSize: 12 }}>
-                                                Want to upgrade to Lifetime?
-                                            </Text>
-                                        </TouchableOpacity>
-                                    )}
-                                </Animated.View>
+
+                                    </Animated.View>
+
+                                    <Animated.View entering={FadeInDown.delay(400).springify()} className="mb-6">
+                                        <Text style={{ fontFamily: 'Outfit-Bold', color: 'white' }} className="text-2xl text-center mb-2">
+                                            {subscriptionType === 'Monthly' ? 'Upgrade Your Plan' : 'Go Lifetime'}
+                                        </Text>
+                                        <Text style={{ fontFamily: 'Outfit-Regular', color: 'rgba(255,255,255,0.5)' }} className="text-center text-sm leading-5 px-4">
+                                            {subscriptionType === 'Monthly'
+                                                ? 'Switch to Yearly to save more, or get Lifetime for a one-time purchase.'
+                                                : 'Switch to a one-time purchase and save forever.'}
+                                        </Text>
+                                    </Animated.View>
+
+                                    {/* Show Upgrade Packages */}
+                                    <View className="w-full gap-3 pb-6">
+                                        {offerings?.availablePackages
+                                            .filter(p => {
+                                                if (subscriptionType === 'Monthly') {
+                                                    return p.packageType === "ANNUAL" || p.packageType === "LIFETIME";
+                                                }
+                                                if (subscriptionType === 'Yearly') {
+                                                    return p.packageType === "LIFETIME";
+                                                }
+                                                return false;
+                                            })
+                                            .sort((a, b) => {
+                                                // Sort: Lifetime first
+                                                const priority = { LIFETIME: 0, ANNUAL: 1 };
+                                                return (priority[a.packageType as keyof typeof priority] || 2) -
+                                                    (priority[b.packageType as keyof typeof priority] || 2);
+                                            })
+                                            .map((pack, index) => {
+                                                const isLifetime = pack.packageType === "LIFETIME";
+                                                const isAnnual = pack.packageType === "ANNUAL";
+
+                                                return (
+                                                    <Animated.View
+                                                        key={pack.identifier}
+                                                        entering={FadeInDown.delay(500 + (index * 100)).springify()}
+                                                    >
+                                                        <TouchableOpacity
+                                                            onPress={() => purchasePackage(pack)}
+                                                            style={{
+                                                                backgroundColor: isLifetime
+                                                                    ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
+                                                                    : 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
+                                                                borderColor: isLifetime ? '#a855f7' : '#3b82f6',
+                                                                borderWidth: 2
+                                                            }}
+                                                            className={`p-4 rounded-2xl w-full relative ${isLifetime ? 'shadow-xl shadow-purple-500/30' : 'shadow-lg shadow-blue-500/20'}`}
+                                                        >
+                                                            <View className="absolute -top-3 right-5 bg-red-500 px-3 py-1 rounded-full shadow-lg shadow-red-500/30">
+                                                                <Text style={{ fontFamily: 'Outfit-Bold', color: 'white', fontSize: 10 }}>
+                                                                    {isLifetime ? 'BEST VALUE' : 'SAVE 25%'}
+                                                                </Text>
+                                                            </View>
+
+                                                            <View className="flex-row justify-between items-start mb-1">
+                                                                <View className="flex-1 pr-4">
+                                                                    <Text style={{ fontFamily: 'Outfit-Bold', color: 'white' }} className="text-lg mb-1">
+                                                                        {pack.product.title.replace(/\s*\(.*?\)\s*/g, '')}
+                                                                    </Text>
+                                                                    <View className="flex-row items-center">
+                                                                        <Text style={{ fontFamily: 'Outfit-Bold', color: '#fff' }} className="text-xl">
+                                                                            {pack.product.priceString}
+                                                                        </Text>
+                                                                        <View className="bg-white/20 px-2 py-1 rounded-full ml-2">
+                                                                            <Text style={{ fontFamily: 'Outfit-Bold', color: '#fff', fontSize: 10 }}>
+                                                                                {isLifetime ? 'ONE TIME' : 'PER YEAR'}
+                                                                            </Text>
+                                                                        </View>
+                                                                    </View>
+                                                                </View>
+                                                                <View className={`p-2 rounded-full ${isLifetime ? 'bg-purple-500/30' : 'bg-blue-500/30'}`}>
+                                                                    <Feather name={isLifetime ? "heart" : "star"} size={20} color="white" />
+                                                                </View>
+                                                            </View>
+                                                        </TouchableOpacity>
+                                                    </Animated.View>
+                                                );
+                                            })}
+                                    </View>
+                                </View>
                             );
                         }
 
@@ -313,13 +379,13 @@ export default function Subscription() {
                                             </TouchableOpacity>
 
                                             <View className="flex-row gap-4">
-                                                <TouchableOpacity onPress={() => router.push('/terms-conditions')}>
+                                                <TouchableOpacity onPress={() => Linking.openURL('https://zenvy-venture.vercel.app/memories/terms-conditions')}>
                                                     <Text style={{ fontFamily: 'Outfit-Regular', color: 'rgba(255,255,255,0.3)' }} className="text-[10px]">
                                                         Terms of Service
                                                     </Text>
                                                 </TouchableOpacity>
                                                 <Text style={{ fontFamily: 'Outfit-Regular', color: 'rgba(255,255,255,0.3)' }} className="text-[10px]">•</Text>
-                                                <TouchableOpacity onPress={() => router.push('/privacy-policy')}>
+                                                <TouchableOpacity onPress={() => Linking.openURL('https://zenvy-venture.vercel.app/memories/privacy-policy')}>
                                                     <Text style={{ fontFamily: 'Outfit-Regular', color: 'rgba(255,255,255,0.3)' }} className="text-[10px]">
                                                         Privacy Policy
                                                     </Text>
