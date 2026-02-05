@@ -100,9 +100,10 @@ export const useEventStore = create<EventState>()(
                      ...data,
                      createdAt: data.created_at,
                      updatedAt: data.updated_at,
+                     // Consistent image mapping
+                     images: data.images?.map((url: string) => ({ local: url, remote: url })) || [],
                      isTimeCapsule: data.is_time_capsule
                  };
-                 
                  
                  set((state) => {
                      const existingIndex = state.events.findIndex(e => e.id === id);
@@ -262,84 +263,83 @@ export const useEventStore = create<EventState>()(
       deleteEvent: async (id) => {
          set({ isLoading: true });
          try {
-             // 1. Clean up images from Storage
+             const FileSystem = require('expo-file-system/legacy');
+             const { data: { user } } = await supabase.auth.getUser();
+             
+             // Clean up images from storage
+
+             // 1. Clean up images from Storage and Local
              const eventToDelete = get().events.find(e => e.id === id);
              
              if (eventToDelete && eventToDelete.images && eventToDelete.images.length > 0) {
-                 console.log(`[deleteEvent] Found ${eventToDelete.images.length} images to delete for event ${id}`);
-                 
-                 // Group images by bucket to handle potential legacy/different buckets
                  const bucketMap: Record<string, string[]> = {};
 
                  eventToDelete.images.forEach(img => {
-                     const remoteUrl = img.remote;
+                     const remoteUrl = typeof img === 'string' ? img : img.remote;
                      if (!remoteUrl) return;
 
-                     // Clean URL
-                     const cleanUrl = remoteUrl.split('?')[0].split('#')[0];
-
-                     let bucketName: string | null = null;
-                     let path: string | null = null;
-
-                     // 1. Explicitly check for 'Event Image' bucket (Primary)
-                     if (cleanUrl.includes('/Event%20Image/')) {
-                         bucketName = 'Event Image';
-                         path = cleanUrl.split('/Event%20Image/')[1];
-                     } else if (cleanUrl.includes('/Event Image/')) {
-                         bucketName = 'Event Image';
-                         path = cleanUrl.split('/Event Image/')[1];
-                     } 
-                     // 2. Legacy 'event-images' check
-                     else if (cleanUrl.includes('/event-images/')) {
-                         bucketName = 'event-images';
-                         path = cleanUrl.split('/event-images/')[1];
-                     }
-                     // 3. Fallback to Regex for other dynamic buckets
-                     else {
-                         const match = cleanUrl.match(/\/public\/([^/]+)\/(.+)$/);
-                         if (match && match.length >= 3) {
-                             bucketName = decodeURIComponent(match[1]);
-                             path = match[2];
+                     try {
+                         // High-Precision URL Parsing
+                         const urlObj = new URL(remoteUrl);
+                         const pathParts = urlObj.pathname.split('/');
+                         // Format: /storage/v1/object/public/[BUCKET]/[PATH...]
+                         const pubIdx = pathParts.indexOf('public');
+                         
+                         if (pubIdx !== -1 && pathParts.length > pubIdx + 2) {
+                             const bucket = decodeURIComponent(pathParts[pubIdx + 1]);
+                             const path = decodeURIComponent(pathParts.slice(pubIdx + 2).join('/'));
+                             
+                             if (!bucketMap[bucket]) bucketMap[bucket] = [];
+                             bucketMap[bucket].push(path);
                          }
-                     }
-
-                     if (bucketName && path) {
-                         // Verify path is decoded (e.g. %20 -> space) and ensure we don't have leading slashes
-                         // split might leave a leading slash if not careful, but usually [1] of /Bucket/ is the content
-                         const finalPath = decodeURIComponent(path);
-                         
-                         if (!bucketMap[bucketName]) bucketMap[bucketName] = [];
-                         bucketMap[bucketName].push(finalPath);
-                         
-                         console.log(`[deleteEvent] Queued for deletion: [${bucketName}] -> ${finalPath}`);
-                     } else {
-                         console.warn(`[deleteEvent] Parsing failed for URL: ${remoteUrl}`);
+                     } catch (e) {
+                         // Minimal fallback for non-URL strings
+                         const parts = remoteUrl.split('/public/');
+                         if (parts.length > 1) {
+                             const segment = parts[1].split('/');
+                             const bucket = decodeURIComponent(segment[0]);
+                             const path = decodeURIComponent(segment.slice(1).join('/'));
+                             if (!bucketMap[bucket]) bucketMap[bucket] = [];
+                             bucketMap[bucket].push(path);
+                         }
                      }
                  });
 
                  // Delete from each bucket found
                  const deletePromises = Object.entries(bucketMap).map(async ([bucket, paths]) => {
                      if (paths.length > 0) {
-                         console.log(`[deleteEvent] Deleting ${paths.length} files from bucket: '${bucket}'`);
                          const { error: storageError } = await supabase.storage
                             .from(bucket)
                             .remove(paths);
                          
-                         if (storageError) {
-                             console.warn(`[deleteEvent] Failed to delete from ${bucket}:`, storageError);
-                         } else {
-                             console.log(`[deleteEvent] Successfully deleted files from ${bucket}`);
-                         }
-                     }
-                 });
+                          if (storageError) {
+                              console.error('[deleteEvent] Storage deletion failed:', storageError);
+                          }
+                      }
+                  });
                  
-                 await Promise.all(deletePromises);
-             } else {
-                 console.log(`[deleteEvent] No images found to delete for event ${id}`);
-             }
+                  await Promise.all(deletePromises);
 
-              // 2. Cancel Notifications
-              await cancelEventNotifications(id);
+                  // **Step 2: Clean up local files**
+                  const localDeletePromises = eventToDelete.images.map(async (img) => {
+                      if (img.local && img.local.startsWith('file:///')) {
+                          try {
+                              const fileInfo = await FileSystem.getInfoAsync(img.local);
+                              if (fileInfo.exists) {
+                                  await FileSystem.deleteAsync(img.local, { idempotent: true });
+                              }
+                          } catch (fsErr) {
+                              // Silent cleanup failure
+                          }
+                      }
+                  });
+                  await Promise.all(localDeletePromises);
+              } else {
+                  // No images to clean up
+              }
+
+               // 3. Cancel Notifications
+               await cancelEventNotifications(id);
 
              const { error } = await supabase
                 .from('events')
@@ -440,12 +440,14 @@ export const useEventStore = create<EventState>()(
       updateEvent: async (id, updates) => {
           set({ isLoading: true });
           try {
+              const FileSystem = require('expo-file-system/legacy');
               const { data: { user } } = await supabase.auth.getUser();
+              const oldEvent = get().events.find(e => e.id === id);
 
               // Handle Image Uploads (Hybrid: keep local + remote)
               let hybridImages = updates.images;
               
-              if (updates.images &&updates.images.length > 0 && user) {
+              if (updates.images && updates.images.length >= 0 && user) {
                   const uploadPromises = updates.images.map(async (imgInput) => {
                      try {
                         // Handle both string (legacy) and EventImage input
@@ -465,7 +467,7 @@ export const useEventStore = create<EventState>()(
                         const compressed = await compressImage(localUri);
                         const uploadUri = compressed.uri;
 
-                     const response = await fetch(uploadUri);
+                        const response = await fetch(uploadUri);
                         const arrayBuffer = await response.arrayBuffer();
                         const fileExt = 'jpeg';
                         const fileName = `${user.id}/${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
@@ -492,6 +494,81 @@ export const useEventStore = create<EventState>()(
                   hybridImages = results.filter((img): img is EventImage => img !== null);
               }
 
+              // **IMAGE CLEANUP LOGIC**
+              // If images were updated, identify removed ones and delete them from Supabase & Local
+              if (oldEvent && hybridImages) {
+                  // Get remote URLs from the new state (hybridImages)
+                  const newRemoteUrls = hybridImages.map(img => typeof img === 'string' ? img : img.remote);
+                  
+                  // Identify images that were in the old state but are NOT in the new state
+                  const removedImages = (oldEvent.images || []).filter(oldImg => {
+                      const oldRemoteUrl = typeof oldImg === 'string' ? oldImg : oldImg.remote;
+                      return !newRemoteUrls.includes(oldRemoteUrl);
+                  });
+
+                  if (removedImages.length > 0) {
+                      console.log(`🚀 [updateEvent] Cleaning up ${removedImages.length} removed images`);
+                      
+                      const bucketMap: Record<string, string[]> = {};
+                      removedImages.forEach(img => {
+                          const remoteUrl = typeof img === 'string' ? img : img.remote;
+                          if (!remoteUrl) return;
+
+                          try {
+                              const storageUrl = new URL(remoteUrl);
+                              const pathParts = storageUrl.pathname.split('/');
+                              const publicIdx = pathParts.indexOf('public');
+                              
+                              if (publicIdx !== -1 && pathParts.length > publicIdx + 2) {
+                                  const bucketName = decodeURIComponent(pathParts[publicIdx + 1]);
+                                  const filePath = decodeURIComponent(pathParts.slice(publicIdx + 2).join('/'));
+                                  
+                                  if (!bucketMap[bucketName]) bucketMap[bucketName] = [];
+                                  bucketMap[bucketName].push(filePath);
+                              }
+                          } catch (e) {
+                              const match = remoteUrl.match(/\/public\/([^/]+)\/(.+)$/);
+                              if (match) {
+                                  const bucket = decodeURIComponent(match[1]);
+                                  const path = decodeURIComponent(match[2].split('?')[0]);
+                                  if (!bucketMap[bucket]) bucketMap[bucket] = [];
+                                  bucketMap[bucket].push(path);
+                              }
+                          }
+                      });
+
+                      const storageDeletePromises = Object.entries(bucketMap).map(async ([bucket, paths]) => {
+                          if (paths.length > 0) {
+                              console.log(`🗑️ [updateEvent] Calling supabase.storage.from('${bucket}').remove(${JSON.stringify(paths)})`);
+                              const { data: deleteData, error: storageError } = await supabase.storage.from(bucket).remove(paths);
+                              if (storageError) {
+                                  console.error(`❌ [updateEvent] Supabase Error:`, storageError);
+                              } else if (!deleteData || deleteData.length === 0) {
+                                  console.warn(`⚠️ [updateEvent] No files were deleted. Check your Supabase DELETE policies!`);
+                              } else {
+                                  console.log(`✨ [updateEvent] Successfully deleted ${deleteData.length} files:`, deleteData);
+                              }
+                          }
+                      });
+                      await Promise.all(storageDeletePromises);
+
+                      // 2. Delete from Local Storage
+                      const localDeletePromises = removedImages.map(async (img) => {
+                          if (img.local && img.local.startsWith('file:///')) {
+                              try {
+                                  const fileInfo = await FileSystem.getInfoAsync(img.local);
+                                  if (fileInfo.exists) {
+                                      await FileSystem.deleteAsync(img.local, { idempotent: true });
+                                  }
+                              } catch (err) {
+                                  console.warn("[updateEvent] Local cleanup failed", err);
+                              }
+                          }
+                      });
+                      await Promise.all(localDeletePromises);
+                  }
+              }
+
               const finalUpdates: any = {
                   ...updates,
                   images: hybridImages?.map(img => 
@@ -505,7 +582,7 @@ export const useEventStore = create<EventState>()(
                   delete finalUpdates.isTimeCapsule;
               }
 
-              // Optimistic update - ensure proper typing
+              // Optimistic update
               set((state) => {
                   return {
                     events: state.events.map((e) => 
@@ -531,20 +608,18 @@ export const useEventStore = create<EventState>()(
                             .from('events')
                             .update(fallbackUpdates)
                             .eq('id', id);
-                        
                          if (fallbackError) throw fallbackError;
-                         // Local state already updated optimistically with images, so we are good.
-                         // But we should be careful if we reload, images will be gone from DB.
                          return;
                     }
                   console.warn("Supabase update failed:", error.message);
-                  set({ error: error.message }); // Restore? Or just notify.
+                  set({ error: error.message });
               } else if (data) {
                  const mapped = {
                      ...data,
-                     images: finalUpdates.images || [], // Ensure we keep what we sent
+                     images: hybridImages || [], 
                      createdAt: data.created_at,
-                     updatedAt: data.updated_at
+                     updatedAt: data.updated_at,
+                     isTimeCapsule: data.is_time_capsule
                  };
                   set((state) => ({
                     events: state.events.map((e) => e.id === id ? mapped : e)
@@ -572,15 +647,17 @@ export const useEventStore = create<EventState>()(
           
           const { data, error } = await supabase.rpc('get_shared_event', { lookup_id: id });
           
-          if (data && data.length > 0) {
-              const e = data[0];
-              return {
-                  ...e,
-                  createdAt: e.created_at,
-                  updatedAt: e.updated_at,
-                  isTimeCapsule: e.is_time_capsule
-              };
-          }
+           if (data && data.length > 0) {
+               const e = data[0];
+               return {
+                   ...e,
+                   createdAt: e.created_at,
+                   updatedAt: e.updated_at,
+                   // Consistent image mapping
+                   images: e.images?.map((url: string) => ({ local: url, remote: url })) || [],
+                   isTimeCapsule: e.is_time_capsule
+               };
+           }
           return null;
       }
     }),

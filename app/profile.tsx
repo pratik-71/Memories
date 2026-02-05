@@ -1,3 +1,4 @@
+import ContactModal from '@/components/ContactModal';
 import { useSubscriptionStore } from '@/store/subscriptionStore';
 import { useThemeStore } from '@/store/themeStore';
 import { Feather } from '@expo/vector-icons';
@@ -8,6 +9,7 @@ import * as StoreReview from 'expo-store-review';
 import { useEffect, useState } from 'react';
 import { Alert, Dimensions, Image, Linking, Platform, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { supabase } from '../lib/supabase';
 
@@ -18,6 +20,7 @@ export default function Profile() {
     const currentTheme = useThemeStore((state) => state.currentTheme);
     const [user, setUser] = useState<any>(null);
     const [loading, setLoading] = useState(true);
+    const [contactModalVisible, setContactModalVisible] = useState(false);
     const { isPro, hasReviewed, setReviewed } = useSubscriptionStore();
 
     useEffect(() => {
@@ -37,14 +40,20 @@ export default function Profile() {
 
     const handleSignOut = async () => {
         try {
+            // Sign out from Supabase
             await supabase.auth.signOut();
+
+            // Sign out from Google if applicable
             try {
                 await GoogleSignin.signOut();
             } catch (e) {
-                console.log("Google SignOut Error:", e);
+                console.log("Google SignOut error or not signed in with Google:", e);
             }
 
-            // Navigate to Welcome screen instead of Sign-in, clearing the stack
+            // Clear auto sign-in provider so it doesn't auto-login next time
+            await AsyncStorage.removeItem('last_login_provider');
+
+            // Navigate to Welcome screen, clearing the stack
             router.dismissAll();
             router.replace('/Onboarding/Welcome');
         } catch (error: any) {
@@ -88,7 +97,11 @@ export default function Profile() {
             icon: 'zap',
             action: () => router.push('/subscription')
         },
-
+        {
+            label: 'Contact Us',
+            icon: 'message-circle',
+            action: () => setContactModalVisible(true)
+        },
         {
             label: 'Privacy Policy',
             icon: 'lock',
@@ -162,29 +175,25 @@ export default function Profile() {
                                 onPress={item.action}
                                 style={{
                                     backgroundColor: 'rgba(255,255,255,0.03)',
-                                    borderColor: item.color ? item.color : 'rgba(255,255,255,0.05)',
-                                    borderWidth: item.color ? 1 : 1
+                                    borderColor: 'rgba(255,255,255,0.05)',
+                                    borderWidth: 1
                                 }}
                                 className="flex-row items-center p-4 rounded-2xl active:bg-white/5"
                             >
                                 <View className="w-10 h-10 rounded-full bg-white/5 items-center justify-center mr-4">
-                                    <Feather name={item.icon as any} size={20} color={item.color || currentTheme.colors.text.primary} />
+                                    <Feather name={item.icon as any} size={20} color={currentTheme.colors.text.primary} />
                                 </View>
                                 <View className="flex-1">
                                     <Text style={{ color: currentTheme.colors.text.primary, fontFamily: 'Outfit-Medium' }} className="text-base">
                                         {item.label}
                                     </Text>
                                     {item.value && (
-                                        <Text style={{ color: item.color || currentTheme.colors.primary, fontFamily: 'Outfit-Bold' }} className="text-xs mt-0.5 uppercase tracking-wider">
+                                        <Text style={{ color: currentTheme.colors.primary, fontFamily: 'Outfit-Bold' }} className="text-xs mt-0.5 uppercase tracking-wider">
                                             {item.value}
                                         </Text>
                                     )}
                                 </View>
-                                {item.color ? (
-                                    <View style={{ backgroundColor: item.color }} className="w-2 h-2 rounded-full shadow-[0_0_10px_rgba(250,204,21,0.5)]" />
-                                ) : (
-                                    <Feather name="chevron-right" size={20} color={currentTheme.colors.text.secondary} />
-                                )}
+                                <Feather name="chevron-right" size={20} color={currentTheme.colors.text.secondary} />
                             </TouchableOpacity>
                         </Animated.View>
                     ))}
@@ -192,7 +201,6 @@ export default function Profile() {
 
                 {/* Bottom Spacer for Sticky Button */}
                 <View className="h-32" />
-
             </ScrollView>
 
             {/* Sticky Logout Button */}
@@ -212,6 +220,12 @@ export default function Profile() {
                     <Text className="text-red-500 font-bold text-base tracking-wide" style={{ fontFamily: 'Outfit-Bold' }}>Log Out</Text>
                 </TouchableOpacity>
             </Animated.View>
+
+            {/* Contact Modal */}
+            <ContactModal
+                visible={contactModalVisible}
+                onClose={() => setContactModalVisible(false)}
+            />
         </View>
     );
 }

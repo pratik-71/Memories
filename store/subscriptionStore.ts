@@ -52,10 +52,20 @@ export const useSubscriptionStore = create<SubscriptionState>()(
       },
 
       updateCustomerInfo: (customerInfo: CustomerInfo) => {
-        // Check for "pro" entitlement.
-        const entitlement = customerInfo.entitlements.active['Memories Pro']; 
+        const activeEntitlements = Object.keys(customerInfo.entitlements.active);
+        console.log("🕵️‍♂️ [Subscription] Active Entitlements on Device:", JSON.stringify(activeEntitlements));
+        
+        // Check for "pro" entitlement (check all possible variations)
+        const entitlement = customerInfo.entitlements.active['Memories Pro'] || 
+                           customerInfo.entitlements.active['Memories pro'] ||
+                           customerInfo.entitlements.active['memories_pro'] ||
+                           customerInfo.entitlements.active['pro']; 
+
+        const isPro = !!entitlement;
+        console.log("💎 [Subscription] Is User Pro?", isPro ? "YES ✅" : "NO ❌");
+
         set({ 
-            isPro: !!entitlement,
+            isPro: isPro,
             activeProductId: entitlement?.productIdentifier ?? null
         });
       },

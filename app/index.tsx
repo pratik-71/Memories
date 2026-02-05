@@ -8,10 +8,19 @@ export default function Index() {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
+        // Initial check
         supabase.auth.getSession().then(({ data: { session } }) => {
             setSession(session);
             setLoading(false);
         });
+
+        // Listen for changes
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+            setSession(session);
+            setLoading(false);
+        });
+
+        return () => subscription.unsubscribe();
     }, []);
 
     if (loading) {

@@ -1,6 +1,5 @@
 import { AestheticDatePicker, AestheticTimePicker } from '@/components/DateTimePicker';
 import { FullScreenLoader } from '@/components/FullScreenLoader';
-import { supabase } from '@/lib/supabase';
 import { useEventStore } from '@/store/eventStore';
 import { useThemeStore } from '@/store/themeStore';
 import { scheduleEventNotifications } from '@/utils/notifications';
@@ -22,6 +21,7 @@ export default function SetupBirthday() {
     const [showDatePicker, setShowDatePicker] = useState(false);
     const [showTimePicker, setShowTimePicker] = useState(false);
     const [loading, setLoading] = useState(false);
+    const [isChecking, setIsChecking] = useState(true);
 
     useEffect(() => {
         checkUser();
@@ -29,21 +29,18 @@ export default function SetupBirthday() {
 
     async function checkUser() {
         try {
-            const { data: { session } } = await supabase.auth.getSession();
-            if (session) {
-                // If user is signed in, check if they already have events
-                // If they do, they have already onboarded, so skip this page.
-                const { events, fetchEvents } = useEventStore.getState();
-                await fetchEvents();
-                // Check fresh state after fetch
-                const updatedEvents = useEventStore.getState().events;
+            const { fetchEvents } = useEventStore.getState();
+            await fetchEvents();
+            const events = useEventStore.getState().events;
 
-                if (updatedEvents.length > 0) {
-                    router.replace('/home');
-                }
+            if (events.length > 0) {
+                router.replace('/home');
+                return;
             }
         } catch (e) {
-            console.log(e);
+            console.log("Check user error:", e);
+        } finally {
+            setIsChecking(false);
         }
     }
 
@@ -81,6 +78,10 @@ export default function SetupBirthday() {
     const handleSkip = () => {
         router.replace('/home');
     };
+
+    if (isChecking) {
+        return <FullScreenLoader />;
+    }
 
     return (
         <View style={{ backgroundColor: currentTheme.colors.background }} className="flex-1 px-6 justify-center">

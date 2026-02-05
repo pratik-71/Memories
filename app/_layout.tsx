@@ -1,3 +1,4 @@
+import { UpdateCheckModal } from '@/components/UpdateCheckModal';
 import RevenueCatService from '@/lib/revenuecat';
 import { supabase } from '@/lib/supabase';
 import { useSubscriptionStore } from '@/store/subscriptionStore';
@@ -87,8 +88,8 @@ export default function RootLayout() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       console.log(`Auth event: ${event}`);
       if (event === 'SIGNED_IN' && session?.user) {
-        // Link RevenueCat user to Supabase ID
-        await RevenueCatService.logIn(session.user.id);
+        // Link RevenueCat user to Supabase ID and email
+        await RevenueCatService.logIn(session.user.id, session.user.email);
         useSubscriptionStore.getState().initialize(); // Refresh sub status for this user
       }
       if (event === 'SIGNED_OUT') {
@@ -209,6 +210,7 @@ export default function RootLayout() {
 
       </Stack>
       <StatusBar style="light" />
+      <UpdateCheckModal />
     </ThemeProvider>
   );
 }

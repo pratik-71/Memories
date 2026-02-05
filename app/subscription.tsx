@@ -64,10 +64,44 @@ export default function Subscription() {
                     {(() => {
                         // Logic to determine view state
                         const annualPackage = offerings?.availablePackages.find(p => p.packageType === "ANNUAL");
-                        const isYearlyActive = isPro && activeProductId === annualPackage?.product.identifier;
+                        const lifetimePackage = offerings?.availablePackages.find(p => p.packageType === "LIFETIME");
 
-                        // If Yearly is active, show the "Premium Active" success screen (DONE state)
-                        if (isYearlyActive) {
+                        // Robust ID matching (handles both Android [id:plan] and iOS [id] formats)
+                        const isAnnualProduct = (id: string) => id === annualPackage?.product.identifier || id.includes('yearly') || id.includes('annual');
+                        const isLifetimeProduct = (id: string) => id === lifetimePackage?.product.identifier || id.includes('lifetime');
+
+                        const isYearlyActive = isPro && activeProductId ? isAnnualProduct(activeProductId) : false;
+                        const isLifetimeActive = isPro && activeProductId ? isLifetimeProduct(activeProductId) : false;
+
+                        // If Lifetime is active, show the "Lifetime Active" success screen
+                        if (isLifetimeActive) {
+                            return (
+                                <Animated.View entering={FadeInDown.delay(300).springify()} className="w-full items-center py-8 px-4">
+                                    <View className="w-24 h-24 bg-purple-500/20 rounded-full items-center justify-center mb-6 shadow-lg shadow-purple-500/30">
+                                        <Feather name="heart" size={40} color="#a855f7" />
+                                    </View>
+                                    <Text style={{ fontFamily: 'Outfit-Bold', color: 'white' }} className="text-3xl mb-3 text-center">
+                                        Lifetime Active
+                                    </Text>
+                                    <Text style={{ fontFamily: 'Outfit-Regular', color: 'rgba(255,255,255,0.6)' }} className="text-center text-lg mb-8 leading-6">
+                                        Unlimited happiness of memories for a lifetime!
+                                    </Text>
+
+                                    <TouchableOpacity
+                                        onPress={() => router.back()}
+                                        style={{ backgroundColor: '#a855f7' }}
+                                        className="w-full py-4 rounded-3xl items-center shadow-lg shadow-purple-500/30"
+                                    >
+                                        <Text style={{ fontFamily: 'Outfit-Bold', color: '#fff' }} className="text-base">
+                                            Start Creating Forever
+                                        </Text>
+                                    </TouchableOpacity>
+                                </Animated.View>
+                            );
+                        }
+
+                        // If ANY other Pro plan is active (Monthly or Yearly)
+                        if (isPro) {
                             return (
                                 <Animated.View entering={FadeInDown.delay(300).springify()} className="w-full items-center py-8 px-4">
                                     <View className="w-20 h-20 bg-green-500/20 rounded-full items-center justify-center mb-6">
@@ -77,31 +111,45 @@ export default function Subscription() {
                                         Premium Active
                                     </Text>
                                     <Text style={{ fontFamily: 'Outfit-Regular', color: 'rgba(255,255,255,0.6)' }} className="text-center text-base mb-8">
-                                        You have the highest plan. Enjoy unlimited access forever!
+                                        You are a Memories Pro user. Enjoy unlimited slots and all features!
                                     </Text>
 
                                     <TouchableOpacity
                                         onPress={() => router.back()}
                                         style={{ backgroundColor: currentTheme.colors.primary }}
-                                        className="w-full py-4 rounded-3xl items-center"
+                                        className="w-full py-4 rounded-3xl items-center shadow-lg shadow-emerald-500/20"
                                     >
                                         <Text style={{ fontFamily: 'Outfit-Bold', color: '#000' }} className="text-base">
                                             Start Creating
                                         </Text>
                                     </TouchableOpacity>
+
+                                    {!isLifetimeActive && offerings && (
+                                        <TouchableOpacity
+                                            onPress={() => {
+                                                // Handle showing upgrade options if they want to switch
+                                                // For now just stay on success screen
+                                            }}
+                                            className="mt-8"
+                                        >
+                                            <Text style={{ fontFamily: 'Outfit-Medium', color: 'rgba(255,255,255,0.4)', fontSize: 12 }}>
+                                                Want to upgrade to Lifetime?
+                                            </Text>
+                                        </TouchableOpacity>
+                                    )}
                                 </Animated.View>
                             );
                         }
 
-                        // Otherwise (Free OR Monthly), show the cards
+                        // Otherwise (Free user), show the pricing cards
                         return (
                             <>
                                 <Animated.View entering={FadeInDown.delay(300).springify()} className="items-center w-full mb-8">
                                     <Text style={{ fontFamily: 'Outfit-Bold', color: 'white' }} className="text-3xl text-center mb-2">
-                                        {isPro ? 'Upgrade Plan' : 'Unlock Unlimited'}
+                                        Unlock Unlimited
                                     </Text>
                                     <Text style={{ fontFamily: 'Outfit-Regular', color: 'rgba(255,255,255,0.5)' }} className="text-center text-base leading-6 px-4">
-                                        {isPro ? 'Switch to annual for better savings.' : 'Create unlimited memories.\nKeep your moments forever.'}
+                                        Create unlimited memories of happiness\ncancel anytime.
                                     </Text>
                                 </Animated.View>
 
@@ -110,102 +158,148 @@ export default function Subscription() {
                                         <Text style={{ fontFamily: 'Outfit-Regular', color: 'rgba(255,255,255,0.5)' }}>Loading offers...</Text>
                                     </View>
                                 ) : (
-                                    <View className="w-full gap-4 pb-10">
-                                        {offerings.availablePackages.map((pack, index) => {
-                                            const isAnnual = pack.packageType === "ANNUAL";
-                                            const isCurrentPlan = pack.product.identifier === activeProductId;
+                                    <View className="w-full gap-3 pb-6">
+                                        {(() => {
+                                            // Sort packages: Lifetime first, then Annual, then Monthly
+                                            const sortedPackages = [...offerings.availablePackages].sort((a, b) => {
+                                                const priority = { LIFETIME: 0, ANNUAL: 1, MONTHLY: 2 };
+                                                return (priority[a.packageType as keyof typeof priority] || 3) -
+                                                    (priority[b.packageType as keyof typeof priority] || 3);
+                                            });
 
-                                            // flexible content based on plan type
-                                            const features = isAnnual ? [
-                                                "Save 20% vs monthly",
-                                                "Cancel anytime",
-                                            ] : [
-                                                "One-time payment",
-                                                "30 days access"
-                                            ];
+                                            return sortedPackages.map((pack, index) => {
+                                                const isAnnual = pack.packageType === "ANNUAL";
+                                                const isLifetime = pack.packageType === "LIFETIME";
+                                                const isCurrentPlan = pack.product.identifier === activeProductId;
 
-                                            return (
-                                                <Animated.View
-                                                    key={pack.identifier}
-                                                    entering={FadeInDown.delay(400 + (index * 100)).springify()}
-                                                >
-                                                    <TouchableOpacity
-                                                        disabled={isCurrentPlan}
-                                                        onPress={() => purchasePackage(pack)}
-                                                        style={{
-                                                            backgroundColor: isCurrentPlan
-                                                                ? 'rgba(74, 222, 128, 0.1)' // Green tint for current
-                                                                : (isAnnual ? 'rgba(250, 250, 250, 0.08)' : 'rgba(255,255,255,0.03)'),
-                                                            borderColor: isCurrentPlan
-                                                                ? '#4ade80'
-                                                                : (isAnnual ? currentTheme.colors.primary : 'rgba(255,255,255,0.1)'),
-                                                            borderWidth: (isAnnual || isCurrentPlan) ? 2 : 1
-                                                        }}
-                                                        className={`p-5 rounded-3xl w-full relative ${isAnnual && !isCurrentPlan ? 'shadow-lg shadow-white/10' : ''}`}
+                                                // flexible content based on plan type
+
+                                                return (
+                                                    <Animated.View
+                                                        key={pack.identifier}
+                                                        entering={FadeInDown.delay(400 + (index * 100)).springify()}
                                                     >
-                                                        {isCurrentPlan && (
-                                                            <View className="absolute -top-3 left-0 right-0 items-center z-10">
-                                                                <View className="bg-green-500 px-4 py-1 rounded-full">
-                                                                    <Text style={{ fontFamily: 'Outfit-Bold', color: '#000', fontSize: 10 }}>
-                                                                        CURRENT PLAN
-                                                                    </Text>
-                                                                </View>
-                                                            </View>
-                                                        )}
-
-                                                        {isAnnual && !isCurrentPlan && (
-                                                            <View className="absolute -top-3 right-5 bg-white px-3 py-1 rounded-full">
-                                                                <Text style={{ fontFamily: 'Outfit-Bold', color: 'black', fontSize: 10 }}>
-                                                                    BEST VALUE
-                                                                </Text>
-                                                            </View>
-                                                        )}
-
-                                                        <View className="flex-row justify-between items-start mb-4">
-                                                            <View className="flex-1 pr-4">
-                                                                <Text style={{ fontFamily: 'Outfit-Bold', color: 'white' }} className="text-xl mb-1">
-                                                                    {pack.product.title.replace(/\s*\(.*?\)\s*/g, '')}
-                                                                </Text>
-                                                                <View>
-                                                                    <Text style={{ fontFamily: 'Outfit-Bold', color: isCurrentPlan ? '#4ade80' : currentTheme.colors.primary }} className="text-2xl">
-                                                                        {pack.product.priceString}
-                                                                        <Text style={{ fontFamily: 'Outfit-Regular', color: 'rgba(255,255,255,0.3)', fontSize: 14 }}>
-                                                                            {isAnnual ? '/year' : '/mo'}
-                                                                        </Text>
-                                                                    </Text>
-                                                                    {isAnnual && pack.product.price > 0 && !isCurrentPlan && (
-                                                                        <Text style={{ fontFamily: 'Outfit-Medium', color: '#4ade80' }} className="text-sm mt-1">
-                                                                            Just {new Intl.NumberFormat(undefined, {
-                                                                                style: 'currency',
-                                                                                currency: pack.product.currencyCode,
-                                                                                maximumFractionDigits: 2
-                                                                            }).format(pack.product.price / 12)}/mo
-                                                                        </Text>
-                                                                    )}
-                                                                </View>
-                                                            </View>
+                                                        <TouchableOpacity
+                                                            disabled={isCurrentPlan}
+                                                            onPress={() => purchasePackage(pack)}
+                                                            style={{
+                                                                backgroundColor: isCurrentPlan
+                                                                    ? 'rgba(74, 222, 128, 0.1)'
+                                                                    : (isLifetime ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' :
+                                                                        (isAnnual ? 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)' : 'rgba(255,255,255,0.03)')),
+                                                                borderColor: isCurrentPlan
+                                                                    ? '#4ade80'
+                                                                    : (isLifetime ? '#a855f7' : (isAnnual ? '#3b82f6' : 'rgba(255,255,255,0.1)')),
+                                                                borderWidth: (isAnnual || isCurrentPlan || isLifetime) ? 2 : 1
+                                                            }}
+                                                            className={`p-4 rounded-2xl w-full relative ${isLifetime && !isCurrentPlan ? 'shadow-xl shadow-purple-500/30' : isAnnual && !isCurrentPlan ? 'shadow-lg shadow-blue-500/20' : ''}`}
+                                                        >
                                                             {isCurrentPlan && (
-                                                                <View className="bg-green-500/20 p-2 rounded-full">
-                                                                    <Feather name="check" size={20} color="#4ade80" />
+                                                                <View className="absolute -top-3 left-0 right-0 items-center z-10">
+                                                                    <View className="bg-green-500 px-4 py-1 rounded-full">
+                                                                        <Text style={{ fontFamily: 'Outfit-Bold', color: '#000', fontSize: 10 }}>
+                                                                            CURRENT PLAN
+                                                                        </Text>
+                                                                    </View>
                                                                 </View>
                                                             )}
-                                                        </View>
 
-                                                        {/* Inline Features */}
-                                                        <View className="gap-2">
-                                                            {features.map((item, i) => (
-                                                                <View key={i} className="flex-row items-center">
-                                                                    <Feather name="check" size={12} color={isAnnual || isCurrentPlan ? "#4ade80" : "rgba(255,255,255,0.5)"} />
-                                                                    <Text style={{ fontFamily: 'Outfit-Regular', color: 'rgba(255,255,255,0.6)' }} className="text-sm ml-2">
-                                                                        {item}
+                                                            {isAnnual && !isCurrentPlan && (
+                                                                <View className="absolute -top-3 right-5 bg-yellow-400 px-3 py-1 rounded-full shadow-lg shadow-yellow-400/30">
+                                                                    <Text style={{ fontFamily: 'Outfit-Bold', color: '#000', fontSize: 10 }}>
+                                                                        POPULAR
                                                                     </Text>
                                                                 </View>
-                                                            ))}
-                                                        </View>
-                                                    </TouchableOpacity>
-                                                </Animated.View>
-                                            )
-                                        })}
+                                                            )}
+
+                                                            {isLifetime && !isCurrentPlan && (
+                                                                <View className="absolute -top-3 right-5 bg-red-500 px-3 py-1 rounded-full shadow-lg shadow-red-500/30 ">
+                                                                    <Text style={{ fontFamily: 'Outfit-Bold', color: 'white', fontSize: 10 }}>
+                                                                        LIMITED TIME
+                                                                    </Text>
+                                                                </View>
+                                                            )}
+
+                                                            <View className="flex-row justify-between items-start mb-3">
+                                                                <View className="flex-1 pr-4">
+                                                                    <Text style={{ fontFamily: 'Outfit-Bold', color: 'white' }} className="text-lg mb-1">
+                                                                        {pack.product.title.replace(/\s*\(.*?\)\s*/g, '')}
+                                                                    </Text>
+
+                                                                    <View>
+                                                                        {isLifetime && !isCurrentPlan ? (
+                                                                            <View>
+                                                                                <View className="flex-row items-center">
+                                                                                    <Text style={{ fontFamily: 'Outfit-Bold', color: '#fff' }} className="text-xl">
+                                                                                        {pack.product.priceString}
+                                                                                    </Text>
+                                                                                    <View className="bg-red-500 px-2 py-1 rounded-full ml-2">
+                                                                                        <Text style={{ fontFamily: 'Outfit-Bold', color: '#fff', fontSize: 10 }}>
+                                                                                            80% OFF
+                                                                                        </Text>
+                                                                                    </View>
+                                                                                </View>
+                                                                                <Text style={{ fontFamily: 'Outfit-Regular', color: 'rgba(255,255,255,0.6)', textDecorationLine: 'line-through' }} className="text-sm mt-1">
+                                                                                    Was {new Intl.NumberFormat(undefined, {
+                                                                                        style: 'currency',
+                                                                                        currency: pack.product.currencyCode,
+                                                                                        maximumFractionDigits: 2
+                                                                                    }).format(pack.product.price / 0.2)}
+                                                                                </Text>
+                                                                            </View>
+                                                                        ) : (
+                                                                            <View>
+                                                                                <View className="flex-row items-center">
+                                                                                    <Text style={{ fontFamily: 'Outfit-Bold', color: isCurrentPlan ? '#4ade80' : (isLifetime ? '#fff' : (isAnnual ? '#fff' : currentTheme.colors.primary)) }} className={`${isAnnual && !isCurrentPlan ? 'text-lg' : 'text-xl'}`}>
+                                                                                        {pack.product.priceString}
+                                                                                        <Text style={{ fontFamily: 'Outfit-Regular', color: isLifetime ? 'rgba(255,255,255,0.8)' : (isAnnual ? 'rgba(255,255,255,0.8)' : 'rgba(255,255,255,0.3)'), fontSize: 16 }}>
+                                                                                            {isLifetime ? ' once' : (isAnnual ? '/year' : '/mo')}
+                                                                                        </Text>
+                                                                                    </Text>
+                                                                                    {isAnnual && !isCurrentPlan && (
+                                                                                        <View className="bg-emerald-500 px-2 py-1 rounded-full ml-2">
+                                                                                            <Text style={{ fontFamily: 'Outfit-Bold', color: '#fff', fontSize: 10 }}>
+                                                                                                SAVE 25%
+                                                                                            </Text>
+                                                                                        </View>
+                                                                                    )}
+                                                                                </View>
+                                                                                {isAnnual && pack.product.price > 0 && !isCurrentPlan && (
+                                                                                    <Text style={{ fontFamily: 'Outfit-Medium', color: '#4ade80' }} className="text-sm mt-1">
+                                                                                        Just {new Intl.NumberFormat(undefined, {
+                                                                                            style: 'currency',
+                                                                                            currency: pack.product.currencyCode,
+                                                                                            maximumFractionDigits: 2
+                                                                                        }).format(pack.product.price / 12)}/mo
+                                                                                    </Text>
+                                                                                )}
+                                                                            </View>
+                                                                        )}
+                                                                    </View>
+                                                                </View>
+                                                                {isCurrentPlan ? (
+                                                                    <View className="bg-green-500/20 p-2 rounded-full">
+                                                                        <Feather name="check" size={20} color="#4ade80" />
+                                                                    </View>
+                                                                ) : isLifetime ? (
+                                                                    <View className="bg-gradient-to-br from-purple-500 to-pink-500 p-2 rounded-full">
+                                                                        <Feather name="heart" size={20} color="white" />
+                                                                    </View>
+                                                                ) : isAnnual ? (
+                                                                    <View className="bg-gradient-to-br from-blue-500 to-blue-600 p-2 rounded-full">
+                                                                        <Feather name="star" size={20} color="white" />
+                                                                    </View>
+                                                                ) : (
+                                                                    <View className="bg-gray-500/20 p-2 rounded-full">
+                                                                        <Feather name="user" size={20} color="rgba(255,255,255,0.5)" />
+                                                                    </View>
+                                                                )}
+                                                            </View>
+                                                        </TouchableOpacity>
+                                                    </Animated.View>
+                                                )
+                                            });
+                                        })()}
 
                                         {/* Restore & Legal */}
                                         <Animated.View entering={FadeInDown.delay(600).springify()} className="items-center mt-4 mb-6">

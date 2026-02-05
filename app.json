@@ -2,7 +2,7 @@
   "expo": {
     "name": "Memories",
     "slug": "memories",
-    "version": "1.0.12",
+    "version": "1.0.14",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "memories",
@@ -15,7 +15,8 @@
       "infoPlist": {
         "NSPhotoLibraryUsageDescription": "The app accesses your photos to let you set cover images for your special memories.",
         "NSCameraUsageDescription": "The app needs access to your camera to let you take photos for your memories.",
-        "NSMicrophoneUsageDescription": "The app needs access to your microphone when taking videos for your memories."
+        "NSMicrophoneUsageDescription": "The app needs access to your microphone when taking videos for your memories.",
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
@@ -34,11 +35,17 @@
         "android.permission.SCHEDULE_EXACT_ALARM",
         "android.permission.POST_NOTIFICATIONS"
       ],
-      "versionCode": 12
+      "versionCode": 14
     },
     "web": {
       "output": "static",
       "favicon": "./assets/images/favicon.png"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/234cbb18-7a14-4678-a280-4cecac0a349d"
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
     },
     "plugins": [
       "expo-router",
@@ -67,6 +74,13 @@
         "expo-image-picker",
         {
           "photosPermission": "The app accesses your photos to let you set cover images for your special memories."
+        }
+      ],
+      [
+        "@react-native-google-signin/google-signin",
+        {
+          "iosClientId": "254107935230-mg16l3icdtqi14fvn9fe219o7htav0u5.apps.googleusercontent.com",
+          "iosUrlScheme": "com.googleusercontent.apps.254107935230-mg16l3icdtqi14fvn9fe219o7htav0u5"
         }
       ],
       [

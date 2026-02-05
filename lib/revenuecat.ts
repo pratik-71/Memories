@@ -22,21 +22,6 @@ class RevenueCatService {
     } else if (Platform.OS === 'android') {
        if (API_KEYS.google) Purchases.configure({ apiKey: API_KEYS.google });
     }
-
-    // DEBUG: Check if Google Play allows us to fetch the yearly product directly
-    try {
-        const products = await Purchases.getProducts(['memories_pro_monthly:memories-pro-yearly', 'memories_pro_monthly:memories-pro-monthly']);
-        console.log("🕵️‍♂️ [DEBUG] Direct Product Fetch Result:", JSON.stringify(products, null, 2));
-        if (products.length === 0) {
-            console.error("❌ [DEBUG] Google Play returned NO products. This means the IDs are invalid or not available to this user account.");
-        } else if (products.length === 1) {
-            console.warn("⚠️ [DEBUG] Google Play only returned 1 product. The other is invalid/inactive.", products[0].identifier);
-        } else {
-            console.log("✅ [DEBUG] Google Play sees BOTH products! The issue is likely in the RevenueCat 'Offering' setup.");
-        }
-    } catch (e) {
-        console.error("❌ [DEBUG] Failed to fetch products directly:", e);
-    }
   }
 
   /**
@@ -103,10 +88,13 @@ class RevenueCatService {
   /**
    * Log in a user with a specific App User ID (Supabase ID)
    */
-  static async logIn(userId: string): Promise<CustomerInfo | null> {
+  static async logIn(userId: string, email?: string): Promise<CustomerInfo | null> {
       try {
           const { customerInfo } = await Purchases.logIn(userId);
-          console.log("✅ [RevenueCat] Logged in as:", userId);
+          if (email) {
+              await Purchases.setEmail(email);
+          }
+          console.log("✅ [RevenueCat] Logged in as:", userId, email ? `(${email})` : "");
           return customerInfo;
       } catch (e) {
           console.error("❌ [RevenueCat] Error logging in:", e);

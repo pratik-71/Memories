@@ -161,56 +161,76 @@ const LiveEventCard = React.memo(({ item, index, onLockedPress }: { item: Specia
                 }}
             >
                 {hasLocalImage && localUri && !isLocked ? (
-                    // Beautiful Image Card with Auto-Scrolling Images
+                    // Beautiful Image Card with Auto-Scrolling Images - Redesigned
                     <View
                         style={{ backgroundColor: '#18181b', borderColor: 'rgba(255,255,255,0.08)' }}
                         className="rounded-3xl border overflow-hidden"
                     >
-                        {/* Auto-Scrolling Image Carousel */}
-                        <ImageCarousel images={item.images} />
+                        {/* Auto-Scrolling Image Carousel - Taller */}
+                        <View style={{ height: 280 }}>
+                            <ImageCarousel images={item.images} />
+                        </View>
 
-                        <View
-                            style={{
-                                position: 'absolute',
-                                top: 0,
-                                left: 0,
-                                right: 0,
-                                bottom: 0,
-                                backgroundColor: 'rgba(0,0,0,0.4)'
-                            }}
-                        />
+                        {/* Gradient-like Overlay - darker at bottom */}
+                        <View style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '30%', backgroundColor: 'rgba(0,0,0,0.3)' }} />
+                        <View style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '70%', backgroundColor: 'rgba(0,0,0,0.65)' }} />
 
-                        <View className="absolute inset-0 p-6 justify-between">
-                            <View className="flex-row justify-between items-start">
-                                <View className="flex-1 mr-4">
-                                    <Text style={{ fontFamily: 'Outfit-Bold', color: 'white' }} className="text-2xl mb-1" numberOfLines={1}>
+                        <View className="absolute inset-0 p-4 justify-between">
+                            {/* Top Section - Title and Status */}
+                            <View className="flex-row justify-between items-start gap-3">
+                                <View className="flex-1 bg-black/70 backdrop-blur-lg rounded-xl p-3">
+                                    <Text style={{ fontFamily: 'Outfit-Bold', color: 'white', textShadowColor: 'rgba(0,0,0,0.9)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 8 }} className="text-xl mb-0.5" numberOfLines={1}>
                                         {item.title}
                                     </Text>
-                                    <Text style={{ fontFamily: 'Outfit-Medium', color: 'rgba(255,255,255,0.9)' }} className="text-xs uppercase tracking-widest">
-                                        {new Date(item.date).toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' })}
+                                    <Text style={{ fontFamily: 'Outfit-Medium', color: 'rgba(255,255,255,0.9)', textShadowColor: 'rgba(0,0,0,0.8)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 6 }} className="text-[10px] uppercase tracking-widest">
+                                        {new Date(item.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
                                     </Text>
                                 </View>
-                                <View className={`flex-row items-center px-3 py-1.5 rounded-full ${item.status === 'completed' ? 'bg-green-500/30' : (item.status === 'paused' ? 'bg-yellow-500/30' : 'bg-white/20')}`}>
-                                    <Text style={{ fontFamily: 'Outfit-Bold', color: 'white' }} className="text-[10px] uppercase tracking-wider">
+                                <View className={`px-3 py-2 rounded-xl ${item.status === 'completed' ? 'bg-green-500/50' : (item.status === 'paused' ? 'bg-yellow-500/50' : 'bg-white/40')} backdrop-blur-lg`}>
+                                    <Text style={{ fontFamily: 'Outfit-Bold', color: 'white', textShadowColor: 'rgba(0,0,0,0.5)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 }} className="text-[9px] uppercase tracking-wider">
                                         {item.status === 'completed' ? 'DONE' : (item.status === 'paused' ? 'PAUSED' : (duration.isPast ? 'SINCE' : 'UNTIL'))}
                                     </Text>
                                 </View>
                             </View>
 
-                            <View className="bg-black/50 backdrop-blur-sm rounded-2xl p-4">
-                                <View className="flex-row gap-2 mb-2">
-                                    <TimeUnit value={duration.years} label="Yrs" />
-                                    <View style={{ width: 1, backgroundColor: 'rgba(255,255,255,0.3)', height: '80%', marginTop: 5 }} />
-                                    <TimeUnit value={duration.months} label="Mths" />
-                                    <View style={{ width: 1, backgroundColor: 'rgba(255,255,255,0.3)', height: '80%', marginTop: 5 }} />
-                                    <TimeUnit value={duration.days} label="Days" />
+                            {/* Bottom Section - Compact Timer */}
+                            <View>
+                                {/* Main Timer */}
+                                <View className="bg-black/70 backdrop-blur-xl rounded-2xl p-3 border border-white/10">
+                                    <View className="flex-row gap-1.5 mb-1.5">
+                                        <TimeUnit value={duration.years} label="YRS" />
+                                        <View style={{ width: 1, backgroundColor: 'rgba(255,255,255,0.25)', alignSelf: 'stretch', marginVertical: 4 }} />
+                                        <TimeUnit value={duration.months} label="MTH" />
+                                        <View style={{ width: 1, backgroundColor: 'rgba(255,255,255,0.25)', alignSelf: 'stretch', marginVertical: 4 }} />
+                                        <TimeUnit value={duration.days} label="DAY" />
+                                    </View>
+                                    <View className="flex-row gap-1.5 pt-1.5 border-t border-white/15">
+                                        <TimeUnit value={duration.hours} label="HRS" />
+                                        <View style={{ width: 1, backgroundColor: 'rgba(255,255,255,0.25)', alignSelf: 'stretch', marginVertical: 4 }} />
+                                        <TimeUnit value={duration.minutes} label="MIN" />
+                                        <View style={{ width: 1, backgroundColor: 'rgba(255,255,255,0.25)', alignSelf: 'stretch', marginVertical: 4 }} />
+                                        <TimeUnit value={duration.seconds} label="SEC" />
+                                    </View>
                                 </View>
-                                <View className="flex-row gap-2 pt-2 border-t border-white/20">
-                                    <TimeUnit value={duration.hours} label="Hrs" />
-                                    <View style={{ width: 1, backgroundColor: 'rgba(255,255,255,0.3)', height: '80%', marginTop: 5 }} />
-                                    <TimeUnit value={duration.minutes} label="Mins" />
-                                    <View style={{ width: 1, backgroundColor: 'rgba(255,255,255,0.3)', height: '80%', marginTop: 5 }} />
-                                    <TimeUnit value={duration.seconds} label="Secs" />
+
+                                {/* Total Summary - Compact Horizontal */}
+                                <View className="flex-row gap-2 mt-2">
+                                    <View className="flex-1 bg-black/60 backdrop-blur-lg rounded-xl p-2 border border-white/10">
+                                        <Text style={{ fontFamily: 'Outfit-Bold', color: 'white' }} className="text-base text-center">
+                                            {Math.floor((duration.years * 365.25 + duration.months * 30.44 + duration.days))}
+                                        </Text>
+                                        <Text style={{ fontFamily: 'Outfit-Medium', color: 'rgba(255,255,255,0.6)' }} className="text-[9px] uppercase tracking-wider text-center">
+                                            Total Days
+                                        </Text>
+                                    </View>
+                                    <View className="flex-1 bg-black/60 backdrop-blur-lg rounded-xl p-2 border border-white/10">
+                                        <Text style={{ fontFamily: 'Outfit-Bold', color: 'white' }} className="text-base text-center">
+                                            {Math.floor((duration.years * 365.25 * 24 + duration.months * 30.44 * 24 + duration.days * 24 + duration.hours))}
+                                        </Text>
+                                        <Text style={{ fontFamily: 'Outfit-Medium', color: 'rgba(255,255,255,0.6)' }} className="text-[9px] uppercase tracking-wider text-center">
+                                            Total Hours
+                                        </Text>
+                                    </View>
                                 </View>
                             </View>
                         </View>
@@ -246,6 +266,28 @@ const LiveEventCard = React.memo(({ item, index, onLockedPress }: { item: Specia
                                 <TimeUnit value={duration.minutes} label="Mins" />
                                 <View style={{ width: 1, backgroundColor: 'rgba(255,255,255,0.1)', height: '80%', marginTop: 5 }} />
                                 <TimeUnit value={duration.seconds} label="Secs" />
+                            </View>
+
+                            {/* Additional Info: Total Days and Hours Passed */}
+                            <View className="mt-3 pt-3 border-t border-white/5">
+                                <View className="flex-row justify-between items-center">
+                                    <View className="items-center">
+                                        <Text style={{ fontFamily: 'Outfit-Bold', color: 'rgba(255,255,255,0.8)' }} className="text-lg">
+                                            {Math.floor((duration.years * 365.25 + duration.months * 30.44 + duration.days))}
+                                        </Text>
+                                        <Text style={{ fontFamily: 'Outfit-Medium', color: 'rgba(255,255,255,0.4)' }} className="text-xs uppercase tracking-wider">
+                                            Total Days
+                                        </Text>
+                                    </View>
+                                    <View className="items-center">
+                                        <Text style={{ fontFamily: 'Outfit-Bold', color: 'rgba(255,255,255,0.8)' }} className="text-lg">
+                                            {Math.floor((duration.years * 365.25 * 24 + duration.months * 30.44 * 24 + duration.days * 24 + duration.hours))}
+                                        </Text>
+                                        <Text style={{ fontFamily: 'Outfit-Medium', color: 'rgba(255,255,255,0.4)' }} className="text-xs uppercase tracking-wider">
+                                            Total Hours
+                                        </Text>
+                                    </View>
+                                </View>
                             </View>
                         </View>
                     </View>
@@ -286,6 +328,28 @@ const LiveEventCard = React.memo(({ item, index, onLockedPress }: { item: Specia
                             <TimeUnit value={duration.minutes} label="Mins" />
                             <View style={{ width: 1, backgroundColor: 'rgba(255,255,255,0.1)', height: '80%', marginTop: 5 }} />
                             <TimeUnit value={duration.seconds} label="Secs" />
+                        </View>
+
+                        {/* Additional Info: Total Days and Hours Passed */}
+                        <View className="mt-3 pt-3 border-t border-white/5">
+                            <View className="flex-row justify-between items-center">
+                                <View className="items-center">
+                                    <Text style={{ fontFamily: 'Outfit-Bold', color: 'rgba(255,255,255,0.8)' }} className="text-lg">
+                                        {Math.floor((duration.years * 365.25 + duration.months * 30.44 + duration.days))}
+                                    </Text>
+                                    <Text style={{ fontFamily: 'Outfit-Medium', color: 'rgba(255,255,255,0.4)' }} className="text-xs uppercase tracking-wider">
+                                        Total Days
+                                    </Text>
+                                </View>
+                                <View className="items-center">
+                                    <Text style={{ fontFamily: 'Outfit-Bold', color: 'rgba(255,255,255,0.8)' }} className="text-lg">
+                                        {Math.floor((duration.years * 365.25 * 24 + duration.months * 30.44 * 24 + duration.days * 24 + duration.hours))}
+                                    </Text>
+                                    <Text style={{ fontFamily: 'Outfit-Medium', color: 'rgba(255,255,255,0.4)' }} className="text-xs uppercase tracking-wider">
+                                        Total Hours
+                                    </Text>
+                                </View>
+                            </View>
                         </View>
                     </View>
                 )}

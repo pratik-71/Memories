@@ -39,7 +39,7 @@ export const CachedImage: React.FC<CachedImageProps> = ({ source, ...props }) =>
             // **Step 1: Try local file first (fast, free)**
             if (local && local.startsWith('file://')) {
                 try {
-                    const FileSystem = require('expo-file-system');
+                    const FileSystem = require('expo-file-system/legacy');
                     const fileInfo = await FileSystem.getInfoAsync(local);
 
                     if (fileInfo.exists) {
@@ -49,7 +49,7 @@ export const CachedImage: React.FC<CachedImageProps> = ({ source, ...props }) =>
                         return;
                     }
                 } catch (fsError) {
-                    console.log('[CachedImage] FileSystem check failed, will use remote');
+                    // Silently fail to remote
                 }
             }
 
